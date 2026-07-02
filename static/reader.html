@@ -1,0 +1,3762 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebVault Reader</title>
+<style>
+:root {
+  --bar-bg: #111;
+  --bar-fg: #fff;
+  --muted: #d7d7d7;
+  --line: rgba(255,255,255,.18);
+  --page-bg: #f4f1ea;
+  --reader-bg: #f4f1ea;
+  --reader-fg: #1c1c1c;
+  --panel-bg: #ffffff;
+  --panel-fg: #151515;
+  --panel-line: #ddd;
+  --accent: #3b82f6;
+  --danger-bg: #fff3f3;
+  --danger-fg: #900;
+}
+html[data-theme="dark"] {
+  --page-bg: #111;
+  --reader-bg: #171717;
+  --reader-fg: #eeeeee;
+  --panel-bg: #1e1e1e;
+  --panel-fg: #f1f1f1;
+  --panel-line: #393939;
+}
+html[data-theme="sepia"] {
+  --page-bg: #f4ecd8;
+  --reader-bg: #f4ecd8;
+  --reader-fg: #3b2f22;
+  --panel-bg: #fff8e7;
+  --panel-fg: #3b2f22;
+  --panel-line: #dccaa4;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--page-bg);
+  color: var(--reader-fg);
+}
+button, select, input { font: inherit; }
+button, select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.08);
+  color: var(--bar-fg);
+  min-height: 34px;
+}
+button {
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+button:hover { background: rgba(255,255,255,.16); }
+#homeBtn {
+  font-weight: 800;
+  letter-spacing: .2px;
+  padding: 6px 12px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+#homeBtn .homeIcon {
+  margin-right: 4px;
+}
+
+button:disabled { opacity: .45; cursor: not-allowed; }
+select { padding: 5px 8px; }
+#app {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+#bar {
+  height: 62px;
+  background: var(--bar-bg);
+  color: var(--bar-fg);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  z-index: 5;
+}
+#titleBlock {
+  min-width: 120px;
+  flex: 1;
+  overflow: hidden;
+}
+#title {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+  line-height: 1.15;
+}
+#chapter {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+#progressWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 290px;
+}
+#progress {
+  width: 220px;
+  accent-color: var(--accent);
+}
+#progressLabel {
+  color: var(--muted);
+  font-size: 13px;
+  min-width: 92px;
+  text-align: right;
+}
+#main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--reader-bg);
+}
+#viewer {
+  width: 100%;
+  height: 100%;
+  background: var(--reader-bg);
+}
+#error {
+  display: none;
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 14px;
+  z-index: 20;
+  padding: 14px 16px;
+  color: var(--danger-fg);
+  background: var(--danger-bg);
+  border: 1px solid #e0b0b0;
+  border-radius: 10px;
+  white-space: pre-wrap;
+  box-shadow: 0 8px 28px rgba(0,0,0,.16);
+}
+#tocPanel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(390px, 88vw);
+  transform: translateX(-102%);
+  transition: transform .18s ease;
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+  border-right: 1px solid var(--panel-line);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 12px 0 35px rgba(0,0,0,.18);
+}
+#tocPanel.open { transform: translateX(0); }
+#tocHeader {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--panel-line);
+  font-weight: 700;
+}
+#tocClose {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: transparent;
+}
+#tocList {
+  overflow: auto;
+  padding: 8px 0 18px;
+}
+.tocItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--panel-fg);
+  padding: 9px 14px;
+  line-height: 1.25;
+}
+.tocItem:hover { background: rgba(127,127,127,.12); }
+.tocItem.active { border-left: 4px solid var(--accent); padding-left: 10px; font-weight: 700; }
+.tocLevel1 { padding-left: 14px; }
+.tocLevel2 { padding-left: 28px; font-size: 14px; }
+.tocLevel3 { padding-left: 42px; font-size: 13px; }
+#overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.22);
+  z-index: 10;
+}
+#overlay.show { display: block; }
+@media (max-width: 920px) {
+  #bar { height: auto; min-height: 62px; flex-wrap: wrap; }
+  #titleBlock { order: 1; flex-basis: calc(100% - 110px); }
+  #progressWrap { order: 4; width: 100%; min-width: 0; }
+  #progress { flex: 1; width: auto; }
+}
+@media (max-width: 560px) {
+  #bar { gap: 6px; padding: 7px; }
+  button { padding: 5px 8px; }
+  #chapter { display: none; }
+  #progressLabel { min-width: 72px; }
+  .desktopOnly { display: none; }
+}
+
+#readerPanel {
+  position: absolute;
+  top: 74px;
+  right: 16px;
+  width: min(560px, calc(100vw - 32px));
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+  border: 1px solid var(--panel-line);
+  border-radius: 16px;
+  z-index: 18;
+  box-shadow: 0 20px 60px rgba(0,0,0,.32);
+  display: none;
+  overflow: hidden;
+}
+#readerPanel.open { display: block; }
+#readerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--panel-line);
+}
+#readerHeader strong { font-size: 17px; }
+#readerClose {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: transparent;
+}
+.readerCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 16px;
+}
+.readerCard {
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  padding: 16px;
+  min-height: 132px;
+  background: rgba(127,127,127,.08);
+  color: var(--panel-fg);
+  text-align: left;
+  cursor: pointer;
+}
+.readerCard:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.16);
+}
+.readerCard.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(59,130,246,.28);
+}
+.readerCardIcon { font-size: 34px; line-height: 1; margin-bottom: 10px; }
+.readerCardTitle { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+.readerCardText { font-size: 13px; opacity: .82; line-height: 1.35; }
+.readerHint {
+  padding: 0 16px 16px;
+  font-size: 12px;
+  opacity: .75;
+  line-height: 1.35;
+}
+@media (max-width: 650px) {
+  #readerPanel { top: 94px; right: 8px; left: 8px; width: auto; }
+  .readerCards { grid-template-columns: 1fr; }
+}
+
+
+
+/* WebVault FlipBook EPUB.js mode: estética tipo libro sin convertir EPUB a imágenes */
+#main.flipbookMode {
+  --book-shadow: rgba(0,0,0,.34);
+  --paper-edge: rgba(255,255,255,.50);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255,255,255,.52), transparent 48%),
+    radial-gradient(circle at 50% 100%, rgba(0,0,0,.20), transparent 48%),
+    linear-gradient(115deg, rgba(0,0,0,.09), transparent 34%, rgba(0,0,0,.12));
+  padding: 24px clamp(10px, 3vw, 42px);
+  perspective: 1800px;
+  overflow: hidden;
+}
+html[data-theme="dark"] #main.flipbookMode {
+  --book-shadow: rgba(0,0,0,.68);
+  --paper-edge: rgba(255,255,255,.10);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255,255,255,.08), transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(0,0,0,.55), transparent 48%),
+    linear-gradient(115deg, #090909, #171717 52%, #0d0d0d);
+}
+html[data-theme="sepia"] #main.flipbookMode {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255,255,255,.46), transparent 48%),
+    radial-gradient(circle at 50% 100%, rgba(95,58,20,.20), transparent 48%),
+    linear-gradient(115deg, #dfd0ad, #f4ecd8 48%, #d8c59c);
+}
+#main.flipbookMode #viewer {
+  position: relative;
+  cursor: pointer;
+  max-width: min(1220px, calc(100vw - 70px));
+  height: calc(100% - 8px);
+  margin: 0 auto;
+  border-radius: 20px 18px 18px 20px;
+  overflow: hidden;
+  background: var(--reader-bg);
+  box-shadow:
+    0 30px 90px var(--book-shadow),
+    0 2px 0 rgba(255,255,255,.25),
+    inset 0 0 0 1px rgba(0,0,0,.10),
+    inset 26px 0 52px rgba(0,0,0,.09),
+    inset -26px 0 52px rgba(0,0,0,.09);
+  transform-style: preserve-3d;
+  transition: max-width .18s ease, border-radius .18s ease, box-shadow .18s ease;
+}
+/* lomo central */
+#main.flipbookMode #viewer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 42px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 6;
+  background:
+    linear-gradient(90deg,
+      rgba(0,0,0,.20),
+      rgba(255,255,255,.18) 42%,
+      rgba(255,255,255,.26) 50%,
+      rgba(0,0,0,.18));
+  opacity: .42;
+}
+/* brillo, cantos y sombra de página */
+#main.flipbookMode #viewer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 7;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.20), transparent 10%, transparent 90%, rgba(0,0,0,.10)),
+    linear-gradient(180deg, rgba(255,255,255,.15), transparent 18%, transparent 82%, rgba(0,0,0,.08)),
+    radial-gradient(circle at 100% 50%, rgba(0,0,0,.10), transparent 28%);
+  mix-blend-mode: multiply;
+  opacity: .32;
+}
+.flipCurl {
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  right: 0;
+  bottom: 0;
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    linear-gradient(135deg, transparent 0 48%, rgba(255,255,255,.72) 49%, rgba(0,0,0,.13) 63%, transparent 66%);
+  transform: translate(32px,32px) rotate(0deg);
+  transition: opacity .18s ease, transform .18s ease;
+}
+#main.flipbookMode #viewer:hover .flipCurl {
+  opacity: .75;
+  transform: translate(8px,8px) rotate(-1deg);
+}
+#main.flipbookMode.turnNext #viewer {
+  animation: webvaultPageTurnNext .48s cubic-bezier(.2,.72,.2,1) both;
+}
+#main.flipbookMode.turnPrev #viewer {
+  animation: webvaultPageTurnPrev .48s cubic-bezier(.2,.72,.2,1) both;
+}
+#main.flipbookMode.turnNext .flipCurl,
+#main.flipbookMode.turnPrev .flipCurl {
+  opacity: 1;
+}
+@keyframes webvaultPageTurnNext {
+  0%   { transform: rotateY(0deg) translateX(0) scale(1); filter: brightness(1); }
+  42%  { transform: rotateY(-7deg) translateX(-10px) scale(.996); filter: brightness(.93); }
+  100% { transform: rotateY(0deg) translateX(0) scale(1); filter: brightness(1); }
+}
+@keyframes webvaultPageTurnPrev {
+  0%   { transform: rotateY(0deg) translateX(0) scale(1); filter: brightness(1); }
+  42%  { transform: rotateY(7deg) translateX(10px) scale(.996); filter: brightness(.93); }
+  100% { transform: rotateY(0deg) translateX(0) scale(1); filter: brightness(1); }
+}
+.readerCard .badge {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(59,130,246,.14);
+  color: var(--panel-fg);
+  font-size: 11px;
+  font-weight: 700;
+}
+#flipbookStatus {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 11;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+}
+#main.flipbookMode #flipbookStatus { display: block; }
+@media (max-width: 700px) {
+  #main.flipbookMode { padding: 10px; }
+  #main.flipbookMode #viewer {
+    max-width: calc(100vw - 20px);
+    border-radius: 12px;
+  }
+  #main.flipbookMode #viewer::before { display: none; }
+  .flipCurl { width: 125px; height: 125px; }
+}
+
+
+.flipNavZone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: none;
+  background: rgba(255,255,255,0.001);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  touch-action: none;
+  user-select: none;
+  pointer-events: auto;
+}
+#main.flipbookMode .flipNavZone { display: block; }
+#flipPrevZone { left: 0; width: 30%; cursor: w-resize; }
+#flipNextZone { right: 0; width: 30%; cursor: e-resize; }
+#main.flipbookMode #flipPrevZone:hover {
+  background: linear-gradient(90deg, rgba(59,130,246,.10), transparent);
+}
+#main.flipbookMode #flipNextZone:hover {
+  background: linear-gradient(270deg, rgba(59,130,246,.10), transparent);
+}
+@media (max-width: 700px) {
+  #flipPrevZone, #flipNextZone { width: 38%; }
+}
+
+/* En modo FlipBook las zonas laterales mandan: el iframe de EPUB.js no debe tragarse el click/drag. */
+#main.flipbookMode #viewer iframe,
+#main.flipbookMode #viewer .epub-view,
+#main.flipbookMode #viewer .epub-container {
+  pointer-events: none !important;
+}
+#main.flipbookMode .flipNavZone {
+  pointer-events: auto !important;
+}
+
+/* Modo selección de resaltado: permite seleccionar texto dentro del iframe EPUB.js. */
+#main.highlightSelectMode #viewer iframe,
+#main.highlightSelectMode #viewer .epub-view,
+#main.highlightSelectMode #viewer .epub-container {
+  pointer-events: auto !important;
+}
+#main.highlightSelectMode .flipNavZone {
+  display: none !important;
+  pointer-events: none !important;
+}
+#main.highlightSelectMode .flipCurl { display: none !important; }
+#main.highlightSelectMode #viewer { cursor: text; }
+#main.highlightSelectMode #flipbookStatus {
+  display: block;
+  background: rgba(220, 38, 38, .92);
+}
+
+/* FIX: desactivar esquina doblada visual que tapa texto */
+.flipCurl,
+#main.flipbookMode #viewer:hover .flipCurl,
+#main.flipbookMode.turnNext .flipCurl,
+#main.flipbookMode.turnPrev .flipCurl {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+
+/* WebVault bookmarks: marcadores locales por libro */
+#bookmarkAddBtn {
+  background: rgba(220,38,38,.92);
+  border-color: rgba(255,255,255,.22);
+  color: #fff;
+  font-weight: 800;
+}
+#bookmarkAddBtn:hover { background: rgba(185,28,28,.96); }
+#bookmarksBtn.activePulse {
+  box-shadow: 0 0 0 3px rgba(220,38,38,.28);
+}
+#bookmarkPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(430px, 90vw);
+  transform: translateX(102%);
+  transition: transform .18s ease;
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+  border-left: 1px solid var(--panel-line);
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -12px 0 35px rgba(0,0,0,.18);
+}
+#bookmarkPanel.open { transform: translateX(0); }
+#bookmarkHeader {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--panel-line);
+  font-weight: 700;
+}
+#bookmarkClose {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: transparent;
+}
+
+.bookmarkSearchBox {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--panel-line);
+  background: rgba(127,127,127,.045);
+}
+#bookmarkSearchInput {
+  min-height: 34px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: rgba(127,127,127,.08);
+  color: var(--panel-fg);
+}
+#bookmarkSearchClear {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: rgba(127,127,127,.08);
+  padding: 5px 9px;
+}
+.bookmarkSearchHint {
+  padding: 8px 14px 0;
+  font-size: 12px;
+  opacity: .72;
+  line-height: 1.35;
+}
+
+#bookmarkList {
+  overflow: auto;
+  padding: 10px 12px 18px;
+}
+.bookmarkItem {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: rgba(127,127,127,.08);
+  color: var(--panel-fg);
+  padding: 10px 10px;
+  margin: 8px 0;
+  text-align: left;
+}
+.bookmarkOpen {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  min-height: 0;
+  text-align: left;
+}
+.bookmarkOpen:hover { background: transparent; text-decoration: underline; }
+.bookmarkTitle {
+  display: block;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.bookmarkMeta {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  opacity: .75;
+  line-height: 1.25;
+}
+.bookmarkExcerpt {
+  display: block;
+  margin: 9px 0 8px;
+  padding: 10px 11px;
+  border-left: 4px solid rgba(220,38,38,.78);
+  border-radius: 10px;
+  background: rgba(220,38,38,.075);
+  font-size: 13px;
+  line-height: 1.45;
+  font-style: italic;
+  opacity: .95;
+  white-space: normal;
+}
+.bookmarkFooter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: .78;
+}
+.bookmarkPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(127,127,127,.12);
+}
+.bookmarkDelete {
+  border-color: rgba(220,38,38,.35);
+  background: rgba(220,38,38,.10);
+  color: #dc2626;
+  min-width: 34px;
+}
+.bookmarkEmpty {
+  padding: 14px;
+  opacity: .75;
+  line-height: 1.4;
+}
+@media (max-width: 560px) {
+  #bookmarkAddBtn, #bookmarksBtn { padding: 5px 7px; }
+}
+
+
+
+/* WebVault library status: leyendo / leído */
+#libraryBtn.activePulse {
+  animation: pulseLibrary .7s ease;
+}
+@keyframes pulseLibrary {
+  0% { box-shadow: 0 0 0 0 rgba(34,197,94,.45); }
+  100% { box-shadow: 0 0 0 12px rgba(34,197,94,0); }
+}
+#markReadBtn {
+  background: rgba(127,127,127,.10);
+  border-color: rgba(255,255,255,.22);
+  color: var(--bar-fg);
+  font-weight: 800;
+}
+#markReadBtn.readingOn {
+  background: rgba(59,130,246,.18);
+  border-color: rgba(59,130,246,.50);
+}
+#markReadBtn.readReady,
+#markReadBtn.readOn {
+  background: rgba(34,197,94,.22);
+  border-color: rgba(34,197,94,.55);
+}
+#markReadBtn.readOn {
+  box-shadow: 0 0 0 2px rgba(34,197,94,.22);
+}
+#markReadBtn:hover { background: rgba(34,197,94,.28); }
+#markReadBtn.activePulse { box-shadow: 0 0 0 3px rgba(34,197,94,.32); }
+#libraryPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(460px, 92vw);
+  transform: translateX(102%);
+  transition: transform .18s ease;
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+  border-left: 1px solid var(--panel-line);
+  z-index: 16;
+  display: none;
+  flex-direction: column;
+  box-shadow: -12px 0 35px rgba(0,0,0,.18);
+  pointer-events: none;
+}
+#libraryPanel.open {
+  display: flex;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+#libraryHeader {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--panel-line);
+  font-weight: 800;
+}
+#libraryClose {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: transparent;
+}
+.libraryTabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--panel-line);
+}
+.libraryTab {
+  color: var(--panel-fg);
+  background: rgba(127,127,127,.10);
+  border-color: var(--panel-line);
+  flex: 1;
+}
+.libraryTab.active {
+  background: rgba(59,130,246,.18);
+  border-color: var(--accent);
+  font-weight: 800;
+}
+#libraryList { overflow: auto; padding: 12px 14px 20px; }
+
+.libraryProfileActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 14px 12px;
+  border-bottom: 1px solid var(--panel-line);
+}
+.libraryProfileActions button {
+  color: var(--panel-fg);
+  background: rgba(127,127,127,.10);
+  border-color: var(--panel-line);
+  font-weight: 800;
+}
+.libraryProfileActions button:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+.profileImportHint {
+  padding: 0 14px 10px;
+  font-size: 12px;
+  opacity: .70;
+  line-height: 1.35;
+  border-bottom: 1px solid var(--panel-line);
+}
+@media (max-width: 650px) {
+  .libraryProfileActions { grid-template-columns: 1fr; }
+}
+
+.libraryItem {
+  position: relative;
+  display: block;
+  width: 100%;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: rgba(127,127,127,.08);
+  color: var(--panel-fg);
+  padding: 12px 40px 12px 12px;
+  margin: 0 0 12px;
+  text-align: left;
+}
+.libraryOpen {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  min-height: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.libraryOpen:hover { background: transparent; }
+.libraryTitle { display: block; font-weight: 850; line-height: 1.25; margin-bottom: 5px; }
+.libraryMeta { display: block; font-size: 12px; opacity: .78; line-height: 1.35; margin-bottom: 8px; }
+.libraryBar {
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(127,127,127,.20);
+  margin: 7px 0 8px;
+}
+.libraryBarFill { height: 100%; width: var(--progress-width, 0%); background: var(--accent); }
+.libraryFooter { display: flex; flex-wrap: wrap; gap: 6px; }
+.libraryPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  background: rgba(127,127,127,.13);
+  padding: 3px 8px;
+  font-size: 12px;
+}
+.libraryDelete {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  color: var(--panel-fg);
+  border-color: transparent;
+  background: transparent;
+  font-size: 18px;
+  min-height: 28px;
+  width: 28px;
+  padding: 0;
+}
+.libraryDelete:hover { background: rgba(239,68,68,.16); color: #ef4444; }
+.libraryEmpty {
+  padding: 18px;
+  border: 1px dashed var(--panel-line);
+  border-radius: 14px;
+  opacity: .78;
+  line-height: 1.45;
+}
+@media (max-width: 650px) {
+  #libraryPanel { width: min(420px, 94vw); }
+  #libraryBtn, #markReadBtn { padding: 5px 7px; }
+}
+
+/* WebVault highlights: resaltados locales por libro */
+#highlightPopup {
+  position: absolute;
+  left: 50%;
+  top: 76px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: 999px;
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+  border: 1px solid var(--panel-line);
+  box-shadow: 0 16px 48px rgba(0,0,0,.28);
+}
+#highlightPopup.open { display: flex; }
+#highlightPopup .hlLabel {
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.hlColor {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 999px;
+  border: 2px solid rgba(0,0,0,.22);
+  padding: 0;
+  background: var(--hl);
+}
+.hlColor:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.18);
+}
+#highlightCancel {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: transparent;
+  min-height: 28px;
+  padding: 3px 8px;
+}
+.bookmarkSectionTitle {
+  margin: 12px 2px 6px;
+  font-weight: 900;
+  font-size: 14px;
+  opacity: .82;
+}
+.highlightItem .bookmarkExcerpt {
+  border-left-color: var(--hl-color, rgba(250,204,21,.9));
+  background: color-mix(in srgb, var(--hl-color, #facc15) 18%, transparent);
+  font-style: normal;
+}
+.highlightSwatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--hl-color, #facc15);
+  border: 1px solid rgba(0,0,0,.20);
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+#highlightsBtn.activePulse {
+  box-shadow: 0 0 0 3px rgba(250,204,21,.35);
+}
+@media (max-width: 650px) {
+  #highlightPopup {
+    top: 96px;
+    max-width: calc(100vw - 16px);
+    border-radius: 18px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+
+/* WebVault in-book search */
+#bookSearchBtn.activePulse {
+  box-shadow: 0 0 0 3px rgba(59,130,246,.35);
+}
+#bookSearchPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 92vw);
+  transform: translateX(102%);
+  transition: transform .18s ease;
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+  border-left: 1px solid var(--panel-line);
+  z-index: 17;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -12px 0 35px rgba(0,0,0,.18);
+}
+#bookSearchPanel.open { transform: translateX(0); }
+#bookSearchHeader {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--panel-line);
+  font-weight: 800;
+}
+#bookSearchClose {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: transparent;
+}
+.bookSearchBox {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--panel-line);
+}
+#bookSearchInput {
+  min-height: 36px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: rgba(127,127,127,.08);
+  color: var(--panel-fg);
+}
+#bookSearchRun {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: rgba(59,130,246,.14);
+}
+#bookSearchList {
+  overflow: auto;
+  padding: 12px 14px 20px;
+}
+.bookSearchItem {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: rgba(127,127,127,.08);
+  color: var(--panel-fg);
+  padding: 12px;
+  margin: 0 0 12px;
+  text-align: left;
+}
+.bookSearchItem:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+.bookSearchTitle {
+  display: block;
+  font-weight: 850;
+  line-height: 1.25;
+  margin-bottom: 6px;
+}
+.bookSearchContext {
+  display: block;
+  margin: 8px 0;
+  padding: 10px 11px;
+  border-left: 4px solid rgba(59,130,246,.75);
+  border-radius: 10px;
+  background: rgba(59,130,246,.075);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.bookSearchContext mark {
+  background: rgba(250,204,21,.42);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.bookSearchMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  opacity: .78;
+}
+.bookSearchPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  background: rgba(127,127,127,.13);
+  padding: 3px 8px;
+}
+.bookSearchEmpty {
+  padding: 18px;
+  border: 1px dashed var(--panel-line);
+  border-radius: 14px;
+  opacity: .78;
+  line-height: 1.45;
+}
+
+
+/* WebVault notes: notas locales por libro */
+#noteDialog {
+  position: absolute;
+  left: 50%;
+  top: 84px;
+  transform: translateX(-50%);
+  z-index: 31;
+  width: min(560px, calc(100vw - 24px));
+  display: none;
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+  border: 1px solid var(--panel-line);
+  border-radius: 18px;
+  box-shadow: 0 22px 70px rgba(0,0,0,.34);
+  overflow: hidden;
+}
+#noteDialog.open { display: block; }
+#noteDialogHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--panel-line);
+  font-weight: 900;
+}
+#noteDialogClose {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: transparent;
+}
+#noteDialogBody {
+  padding: 14px;
+}
+#noteSelectedText {
+  display: block;
+  margin: 0 0 12px;
+  padding: 10px 11px;
+  border-left: 4px solid rgba(59,130,246,.78);
+  border-radius: 10px;
+  background: rgba(59,130,246,.075);
+  font-size: 13px;
+  line-height: 1.45;
+  font-style: italic;
+}
+#noteColorRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.noteColorLabel {
+  font-size: 13px;
+  font-weight: 800;
+  opacity: .82;
+  margin-right: 2px;
+}
+.noteColor {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 999px;
+  border: 2px solid rgba(0,0,0,.22);
+  padding: 0;
+  background: var(--note-color);
+}
+.noteColor.active {
+  box-shadow: 0 0 0 3px rgba(59,130,246,.28);
+  border-color: var(--accent);
+}
+#noteText {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  padding: 10px 11px;
+  background: rgba(127,127,127,.08);
+  color: var(--panel-fg);
+  line-height: 1.45;
+}
+.noteDialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+#noteSave {
+  color: var(--panel-fg);
+  border-color: rgba(59,130,246,.45);
+  background: rgba(59,130,246,.16);
+  font-weight: 800;
+}
+#noteCancel {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: transparent;
+}
+#noteAddFromSelection {
+  color: var(--panel-fg);
+  border-color: rgba(59,130,246,.45);
+  background: rgba(59,130,246,.16);
+  font-weight: 800;
+}
+.noteItem .bookmarkExcerpt {
+  border-left-color: var(--note-color, rgba(59,130,246,.78));
+  background: color-mix(in srgb, var(--note-color, #93c5fd) 16%, transparent);
+  font-style: normal;
+}
+.noteItem .noteTextBlock {
+  border-left: 4px solid var(--note-color, rgba(59,130,246,.78));
+}
+.noteTextBlock {
+  display: block;
+  margin: 8px 0;
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: rgba(127,127,127,.10);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+@media (max-width: 650px) {
+  #noteDialog { top: 96px; }
+  #noteText { min-height: 100px; }
+}
+
+
+
+/* WebVault instructions panel */
+#instructionsBtn.activePulse {
+  box-shadow: 0 0 0 3px rgba(59,130,246,.35);
+}
+#instructionsPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(560px, 94vw);
+  transform: translateX(102%);
+  transition: transform .18s ease;
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+  border-left: 1px solid var(--panel-line);
+  z-index: 18;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -12px 0 35px rgba(0,0,0,.18);
+}
+#instructionsPanel.open { transform: translateX(0); }
+#instructionsHeader {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--panel-line);
+  font-weight: 900;
+}
+#instructionsClose {
+  color: var(--panel-fg);
+  border-color: var(--panel-line);
+  background: transparent;
+}
+#instructionsContent {
+  overflow: auto;
+  padding: 14px 16px 28px;
+  line-height: 1.45;
+}
+.instructionsBlock {
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: rgba(127,127,127,.07);
+  padding: 12px 13px;
+  margin: 0 0 12px;
+}
+.instructionsBlock h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.instructionsBlock ul {
+  margin: 8px 0 0 20px;
+  padding: 0;
+}
+.instructionsBlock li { margin: 4px 0; }
+.instructionsMini {
+  opacity: .78;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.instructionsKbd {
+  display: inline-block;
+  border: 1px solid var(--panel-line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin: 0 2px;
+  background: rgba(127,127,127,.10);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <button id="homeBtn" type="button" title="Volver a WebVault" onclick="window.location.href='/'"><span class="homeIcon">📚</span>WebVault</button>
+    <button id="tocBtn" type="button" title="Índice">☰</button>
+    <button id="prev" type="button" title="Página anterior: ← / PgUp">◀</button>
+    <button id="next" type="button" title="Página siguiente: → / PgDn">▶</button>
+
+    <div id="titleBlock">
+      <span id="title">WebVault Reader</span>
+      <span id="chapter">Cargando…</span>
+    </div>
+
+    <button id="fontMinus" type="button" title="Reducir fuente">A−</button>
+    <button id="fontPlus" type="button" title="Aumentar fuente">A+</button>
+    <select id="theme" title="Tema">
+      <option value="sepia">Sepia</option>
+      <option value="light">Claro</option>
+      <option value="dark">Oscuro</option>
+    </select>
+    <button id="fullscreen" type="button" title="Pantalla completa">⛶</button>
+    <button id="readerBtn" type="button" title="Cambiar lector">📖 Lectores</button>
+    <button id="bookmarkAddBtn" type="button" title="Recordar este lugar con una tarjeta y frase del libro">❤️ Recordar</button>
+    <button id="bookmarksBtn" type="button" title="Ver marcadores guardados">📑 Marcadores</button>
+    <button id="highlightsBtn" type="button" title="Resaltar el texto seleccionado">🖍️ Resaltar</button>
+    <button id="bookSearchBtn" type="button" title="Buscar una frase dentro de este libro">🔎 Buscar</button>
+    <button id="instructionsBtn" type="button" title="Ver instrucciones completas del lector">❔ Instrucciones</button>
+    <button id="libraryBtn" type="button" title="Ver libros en lectura y leídos">📚 Mi biblioteca</button>
+    <button id="markReadBtn" type="button" title="Estado de lectura">📘 Leyendo</button>
+
+    <div id="progressWrap">
+      <input id="progress" type="range" min="0" max="1000" value="0" step="1" title="Deslizador de lectura">
+      <span id="progressLabel">0%</span>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="overlay"></div>
+    <div id="highlightPopup" aria-label="Elegir color de resaltado">
+      <span class="hlLabel">🖍️ Resaltar</span>
+      <button class="hlColor" type="button" data-color="yellow" title="Amarillo" style="--hl:#facc15"></button>
+      <button class="hlColor" type="button" data-color="green" title="Verde" style="--hl:#86efac"></button>
+      <button class="hlColor" type="button" data-color="blue" title="Azul" style="--hl:#93c5fd"></button>
+      <button class="hlColor" type="button" data-color="pink" title="Rosa" style="--hl:#f9a8d4"></button>
+      <button class="hlColor" type="button" data-color="orange" title="Naranja" style="--hl:#fdba74"></button>
+      <button id="noteAddFromSelection" type="button" title="Añadir una nota al texto seleccionado">📝 Nota</button>
+      <button id="highlightCancel" type="button" title="Cancelar resaltado">Cancelar</button>
+    </div>
+
+    <div id="noteDialog" aria-label="Añadir nota">
+      <div id="noteDialogHeader">
+        <span>📝 Nota</span>
+        <button id="noteDialogClose" type="button">Cerrar</button>
+      </div>
+      <div id="noteDialogBody">
+        <span id="noteSelectedText"></span>
+        <div id="noteColorRow" aria-label="Color de la nota">
+          <span class="noteColorLabel">Color</span>
+          <button class="noteColor active" type="button" data-color="yellow" title="Amarillo" style="--note-color:#facc15"></button>
+          <button class="noteColor" type="button" data-color="green" title="Verde" style="--note-color:#86efac"></button>
+          <button class="noteColor" type="button" data-color="blue" title="Azul" style="--note-color:#93c5fd"></button>
+          <button class="noteColor" type="button" data-color="pink" title="Rosa" style="--note-color:#f9a8d4"></button>
+          <button class="noteColor" type="button" data-color="orange" title="Naranja" style="--note-color:#fdba74"></button>
+        </div>
+        <textarea id="noteText" placeholder="Escribe tu nota sobre este fragmento…"></textarea>
+      </div>
+      <div class="noteDialogActions">
+        <button id="noteCancel" type="button">Cancelar</button>
+        <button id="noteSave" type="button">Guardar nota</button>
+      </div>
+    </div>
+    <aside id="readerPanel" aria-label="Selector de lector">
+      <div id="readerHeader">
+        <strong>Lectores</strong>
+        <button id="readerClose" type="button">Cerrar</button>
+      </div>
+      <div class="readerCards">
+        <button id="readerEpub" class="readerCard active" type="button">
+          <div class="readerCardIcon">📗</div>
+          <div class="readerCardTitle">EPUB.js</div>
+          <div class="readerCardText">Lector refluible actual, optimizado para EPUB, progreso, índice, temas y tamaño de fuente.</div>
+        </button>
+        <button id="readerFlipbook" class="readerCard" type="button">
+          <div class="readerCardIcon">📖</div>
+          <div class="readerCardTitle">Flipbook</div>
+          <div class="readerCardText">Modo libro sobre EPUB.js: doble página en escritorio, sombra de lomo, animación de paso, temas, índice y progreso.</div>
+          <span class="badge">Recomendado</span>
+        </button>
+      </div>
+      <div class="readerHint">Nota: este modo no convierte el EPUB en imágenes. Usa EPUB.js como motor y añade una presentación visual tipo libro, más segura y compatible con progreso de lectura.</div>
+    </aside>
+    <aside id="bookmarkPanel" aria-label="Marcadores del libro">
+      <div id="bookmarkHeader">
+        <span>📑 Marcadores, resaltados y notas</span>
+        <button id="bookmarkClose" type="button">Cerrar</button>
+      </div>
+      <div class="bookmarkSearchBox">
+        <input id="bookmarkSearchInput" type="search" placeholder="Buscar en notas…" autocomplete="off">
+        <button id="bookmarkSearchClear" type="button" title="Limpiar búsqueda de notas">×</button>
+      </div>
+      <div id="bookmarkList"></div>
+    </aside>
+
+    <aside id="bookSearchPanel" aria-label="Buscar dentro del libro">
+      <div id="bookSearchHeader">
+        <span>🔎 Buscar en este libro</span>
+        <button id="bookSearchClose" type="button">Cerrar</button>
+      </div>
+      <div class="bookSearchBox">
+        <input id="bookSearchInput" type="search" placeholder="Frase o palabra…" autocomplete="off">
+        <button id="bookSearchRun" type="button">Buscar</button>
+      </div>
+      <div id="bookSearchList">
+        <div class="bookSearchEmpty">Escribe una frase para buscar dentro del EPUB abierto.</div>
+      </div>
+    </aside>
+
+    <aside id="instructionsPanel" aria-label="Instrucciones completas del lector">
+      <div id="instructionsHeader">
+        <span>❔ Instrucciones completas</span>
+        <button id="instructionsClose" type="button">Volver al libro</button>
+      </div>
+      <div id="instructionsContent">
+        <div class="instructionsBlock">
+          <h3>📖 Lectura</h3>
+          <ul>
+            <li><strong>◀ / ▶</strong>: página anterior o siguiente.</li>
+            <li><strong>☰</strong>: abre el índice del EPUB.</li>
+            <li><strong>A− / A+</strong>: cambia el tamaño de letra.</li>
+            <li><strong>Tema</strong>: sepia, claro u oscuro.</li>
+            <li><strong>⛶</strong>: pantalla completa.</li>
+          </ul>
+          <div class="instructionsMini">También puedes usar <span class="instructionsKbd">←</span>, <span class="instructionsKbd">→</span>, <span class="instructionsKbd">PgUp</span>, <span class="instructionsKbd">PgDn</span> y <span class="instructionsKbd">Esc</span>.</div>
+        </div>
+
+        <div class="instructionsBlock">
+          <h3>📖 Lectores</h3>
+          <ul>
+            <li><strong>EPUB.js</strong>: lector refluible normal.</li>
+            <li><strong>FlipBook</strong>: modo libro con doble página visual en escritorio.</li>
+          </ul>
+        </div>
+
+        <div class="instructionsBlock">
+          <h3>❤️ Marcadores</h3>
+          <ul>
+            <li><strong>❤️ Recordar</strong>: guarda el lugar actual con una frase visible del libro.</li>
+            <li><strong>📑 Marcadores</strong>: muestra lugares guardados, resaltados y notas.</li>
+            <li>Al pulsar un marcador, el lector salta a esa posición y marca temporalmente el punto.</li>
+          </ul>
+        </div>
+
+        <div class="instructionsBlock">
+          <h3>🖍️ Resaltados</h3>
+          <ul>
+            <li>Selecciona texto dentro del libro.</li>
+            <li>Pulsa <strong>🖍️ Resaltar</strong>.</li>
+            <li>Elige color: amarillo, verde, azul, rosa o naranja.</li>
+          </ul>
+        </div>
+
+        <div class="instructionsBlock">
+          <h3>📝 Notas</h3>
+          <ul>
+            <li>Selecciona texto dentro del libro.</li>
+            <li>Pulsa <strong>🖍️ Resaltar</strong> y después <strong>📝 Nota</strong>.</li>
+            <li>Elige color, escribe tu comentario y guarda.</li>
+            <li>La nota sombrea el texto con su color y aparece en <strong>📑 Marcadores</strong>.</li>
+          </ul>
+        </div>
+
+        <div class="instructionsBlock">
+          <h3>🔎 Búsquedas</h3>
+          <ul>
+            <li><strong>🔎 Buscar</strong>: busca una palabra o frase dentro del libro abierto.</li>
+            <li>En <strong>📑 Marcadores</strong> puedes buscar dentro de tus notas por texto, cita, capítulo o color.</li>
+          </ul>
+        </div>
+
+        <div class="instructionsBlock">
+          <h3>📚 Mi biblioteca</h3>
+          <ul>
+            <li><strong>📘 Leyendo</strong>: libros empezados.</li>
+            <li><strong>✅ Leídos</strong>: libros terminados o marcados como leídos.</li>
+            <li>El lector marca como leído automáticamente al superar aproximadamente el 95%.</li>
+          </ul>
+        </div>
+
+        <div class="instructionsBlock">
+          <h3>💾 Perfil del lector</h3>
+          <ul>
+            <li><strong>⬇️ Exportar perfil</strong>: guarda progreso, temas, biblioteca, marcadores, resaltados y notas en JSON.</li>
+            <li><strong>⬆️ Importar perfil</strong>: restaura ese JSON en otro navegador o equipo.</li>
+          </ul>
+          <div class="instructionsMini">Los datos personales del lector se guardan en el navegador mediante localStorage.</div>
+        </div>
+
+        <div class="instructionsBlock">
+          <h3>🦆 Regla de oro</h3>
+          <ul>
+            <li><strong>Esc</strong> cierra paneles.</li>
+            <li><strong>Volver al libro</strong> cierra estas instrucciones y regresa al lector.</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+
+    <aside id="libraryPanel" aria-label="Mi biblioteca">
+      <div id="libraryHeader">
+        <span>📚 Mi biblioteca</span>
+        <button id="libraryClose" type="button">Cerrar</button>
+      </div>
+      <div class="libraryTabs">
+        <button id="libraryReadingTab" class="libraryTab active" type="button">📘 Leyendo</button>
+        <button id="libraryFinishedTab" class="libraryTab" type="button">✅ Leídos</button>
+      </div>
+      <div class="libraryProfileActions">
+        <button id="profileExportBtn" type="button" title="Exportar progreso, marcadores, resaltados, notas y biblioteca">⬇️ Exportar perfil</button>
+        <button id="profileImportBtn" type="button" title="Importar un perfil WebVault guardado">⬆️ Importar perfil</button>
+        <input id="profileImportFile" type="file" accept="application/json,.json" style="display:none">
+      </div>
+      <div class="profileImportHint">El perfil se guarda en un archivo JSON e incluye progreso, temas, lector elegido, marcadores, resaltados, notas y Mi biblioteca.</div>
+      <div id="libraryList"></div>
+    </aside>
+    <aside id="tocPanel" aria-label="Índice del libro">
+      <div id="tocHeader">
+        <span>Índice</span>
+        <button id="tocClose" type="button">Cerrar</button>
+      </div>
+      <div id="tocList"></div>
+    </aside>
+    <div id="error"></div>
+    <div id="viewer"><button id="flipPrevZone" class="flipNavZone" type="button" aria-label="Página anterior"></button><button id="flipNextZone" class="flipNavZone" type="button" aria-label="Página siguiente"></button><div class="flipCurl" aria-hidden="true"></div></div>
+    <div id="flipbookStatus">Modo FlipBook EPUB.js · texto refluible</div>
+  </div>
+</div>
+
+<script src="/static/jszip.min.js"></script>
+<script src="/static/epub.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const STORAGE_PREFIX = "webvault.reader.v2.";
+  const BOOKMARKS_PREFIX = "webvault.bookmarks.v1.";
+  const HIGHLIGHTS_PREFIX = "webvault.highlights.v1.";
+  const NOTES_PREFIX = "webvault.notes.v1.";
+  const LIBRARY_KEY = "webvault.library.v5";
+  const READ_THRESHOLD = 0.95;
+  const STARTED_THRESHOLD = 0.01;
+  const DEFAULT_FONT_SIZE = 100;
+  const MIN_FONT_SIZE = 70;
+  const MAX_FONT_SIZE = 180;
+  const FONT_STEP = 10;
+  const PROGRESS_MAX = 1000;
+
+  let book = null;
+  let rendition = null;
+  let spineItems = [];
+  let tocItems = [];
+  let currentIndex = 0;
+  let currentPercent = 0;
+  let currentCfi = null;
+  let isSliding = false;
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let readerMode = "epub";
+  let pendingHighlight = null;
+  let pendingNote = null;
+  let selectedNoteColor = "yellow";
+  let highlightSelectMode = false;
+  let libraryView = "reading";
+  let bookSearchGeneration = 0;
+  let activeTemporaryMarker = null;
+
+  const el = {
+    root: document.documentElement,
+    title: document.getElementById("title"),
+    chapter: document.getElementById("chapter"),
+    viewer: document.getElementById("viewer"),
+    error: document.getElementById("error"),
+    prev: document.getElementById("prev"),
+    next: document.getElementById("next"),
+    progress: document.getElementById("progress"),
+    progressLabel: document.getElementById("progressLabel"),
+    tocBtn: document.getElementById("tocBtn"),
+    tocPanel: document.getElementById("tocPanel"),
+    tocList: document.getElementById("tocList"),
+    tocClose: document.getElementById("tocClose"),
+    overlay: document.getElementById("overlay"),
+    fontMinus: document.getElementById("fontMinus"),
+    fontPlus: document.getElementById("fontPlus"),
+    theme: document.getElementById("theme"),
+    fullscreen: document.getElementById("fullscreen"),
+    readerBtn: document.getElementById("readerBtn"),
+    readerPanel: document.getElementById("readerPanel"),
+    readerClose: document.getElementById("readerClose"),
+    readerEpub: document.getElementById("readerEpub"),
+    readerFlipbook: document.getElementById("readerFlipbook"),
+    bookmarkAddBtn: document.getElementById("bookmarkAddBtn"),
+    bookmarksBtn: document.getElementById("bookmarksBtn"),
+    bookmarkPanel: document.getElementById("bookmarkPanel"),
+    bookmarkList: document.getElementById("bookmarkList"),
+    bookmarkSearchInput: document.getElementById("bookmarkSearchInput"),
+    bookmarkSearchClear: document.getElementById("bookmarkSearchClear"),
+    bookmarkClose: document.getElementById("bookmarkClose"),
+    highlightsBtn: document.getElementById("highlightsBtn"),
+    bookSearchBtn: document.getElementById("bookSearchBtn"),
+    bookSearchPanel: document.getElementById("bookSearchPanel"),
+    bookSearchInput: document.getElementById("bookSearchInput"),
+    bookSearchRun: document.getElementById("bookSearchRun"),
+    bookSearchClose: document.getElementById("bookSearchClose"),
+    bookSearchList: document.getElementById("bookSearchList"),
+    instructionsBtn: document.getElementById("instructionsBtn"),
+    instructionsPanel: document.getElementById("instructionsPanel"),
+    instructionsClose: document.getElementById("instructionsClose"),
+    libraryBtn: document.getElementById("libraryBtn"),
+    markReadBtn: document.getElementById("markReadBtn"),
+    libraryPanel: document.getElementById("libraryPanel"),
+    libraryList: document.getElementById("libraryList"),
+    libraryClose: document.getElementById("libraryClose"),
+    libraryReadingTab: document.getElementById("libraryReadingTab"),
+    libraryFinishedTab: document.getElementById("libraryFinishedTab"),
+    profileExportBtn: document.getElementById("profileExportBtn"),
+    profileImportBtn: document.getElementById("profileImportBtn"),
+    profileImportFile: document.getElementById("profileImportFile"),
+    highlightPopup: document.getElementById("highlightPopup"),
+    highlightCancel: document.getElementById("highlightCancel"),
+    noteAddFromSelection: document.getElementById("noteAddFromSelection"),
+    noteDialog: document.getElementById("noteDialog"),
+    noteDialogClose: document.getElementById("noteDialogClose"),
+    noteSelectedText: document.getElementById("noteSelectedText"),
+    noteText: document.getElementById("noteText"),
+    noteCancel: document.getElementById("noteCancel"),
+    noteSave: document.getElementById("noteSave"),
+    flipbookStatus: document.getElementById("flipbookStatus"),
+    flipPrevZone: document.getElementById("flipPrevZone"),
+    flipNextZone: document.getElementById("flipNextZone"),
+    main: document.getElementById("main")
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const file = params.get("file");
+  const storageKey = STORAGE_PREFIX + (file || "nofile");
+  const bookmarksKey = BOOKMARKS_PREFIX + (file || "nofile");
+  const highlightsKey = HIGHLIGHTS_PREFIX + (file || "nofile");
+  const notesKey = NOTES_PREFIX + (file || "nofile");
+
+
+  function reportReaderVisit() {
+    if (!file) return;
+
+    try {
+      fetch("/api/stats/reader-visit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          file: file,
+          title: (el.title && el.title.textContent) || ""
+        }),
+        keepalive: true
+      }).catch(function () {});
+    } catch (err) {}
+  }
+
+  function showError(message) {
+    el.error.style.display = "block";
+    el.error.textContent = String(message || "Error desconocido");
+    console.error(message);
+  }
+
+  function hideError() {
+    el.error.style.display = "none";
+    el.error.textContent = "";
+  }
+
+  function getSavedState() {
+    try {
+      return JSON.parse(localStorage.getItem(storageKey) || "{}");
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function saveState(patch) {
+    try {
+      const state = Object.assign({}, getSavedState(), patch || {}, { updatedAt: Date.now() });
+      localStorage.setItem(storageKey, JSON.stringify(state));
+    } catch (err) {
+      console.warn("No se pudo guardar el estado de lectura", err);
+    }
+  }
+
+
+  function getLibrary() {
+    try {
+      const data = JSON.parse(localStorage.getItem(LIBRARY_KEY) || "{}");
+      return data && typeof data === "object" ? data : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function saveLibrary(data) {
+    try {
+      localStorage.setItem(LIBRARY_KEY, JSON.stringify(data || {}));
+    } catch (err) {
+      console.warn("No se pudo guardar Mi biblioteca", err);
+    }
+  }
+
+  function getReadableTitle() {
+    const title = (el.title && el.title.textContent || "").trim();
+    if (title && title !== "Cargando…" && title !== "WebVault Reader" && title !== "Leyendo") return title;
+    try {
+      const decoded = decodeURIComponent(file || "");
+      const name = decoded.split("/").filter(Boolean).pop() || decoded || "Libro";
+      return name.replace(/\.epub$/i, "");
+    } catch (err) {
+      return file || "Libro";
+    }
+  }
+
+  function percentNumberForDisplay(value) {
+    const p = Math.round((Number(value) || 0) * 1000) / 10;
+    return p.toFixed(p % 1 === 0 ? 0 : 1);
+  }
+
+  function currentLibraryItem() {
+    if (!file) return null;
+    return getLibrary()[file] || null;
+  }
+
+  function isCurrentBookFinished() {
+    const item = currentLibraryItem();
+    return !!(item && item.status === "finished");
+  }
+
+  function updateMarkReadButton() {
+    if (!el.markReadBtn) return;
+    const finished = isCurrentBookFinished();
+    el.markReadBtn.classList.remove("readingOn", "readReady", "readOn");
+
+    if (finished) {
+      el.markReadBtn.textContent = "✅ Leído";
+      el.markReadBtn.title = "Libro marcado como leído";
+      el.markReadBtn.classList.add("readOn");
+      return;
+    }
+
+    if ((Number(currentPercent) || 0) >= READ_THRESHOLD) {
+      el.markReadBtn.textContent = "✅ Leído";
+      el.markReadBtn.title = "Se ha alcanzado el 95%; se marcará como leído";
+      el.markReadBtn.classList.add("readReady");
+      return;
+    }
+
+    el.markReadBtn.textContent = "📘 Leyendo";
+    el.markReadBtn.title = "Libro en lectura; se marcará leído al llegar al 95%";
+    el.markReadBtn.classList.add("readingOn");
+  }
+
+  function updateLibraryStatus(forceStatus) {
+    if (!file) return;
+
+    const data = getLibrary();
+    const previous = data[file] || {};
+    const now = Date.now();
+    const percent = clamp(Number(currentPercent) || 0, 0, 1);
+
+    const recordBase = Object.assign({}, previous, {
+      file: file,
+      title: getReadableTitle(),
+      chapter: (el.chapter && el.chapter.textContent || previous.chapter || "").trim(),
+      cfi: currentCfi || previous.cfi || null,
+      index: Number(currentIndex) || Number(previous.index) || 0,
+      percent: Math.max(Number(previous.percent) || 0, percent),
+      updatedAt: now
+    });
+
+    if (previous.status === "finished") {
+      data[file] = Object.assign(recordBase, {
+        status: "finished",
+        finishedAt: previous.finishedAt || now,
+        finishedBy: previous.finishedBy || "percent95"
+      });
+      saveLibrary(data);
+      updateMarkReadButton();
+      return;
+    }
+
+    if (forceStatus === "finished" || percent >= READ_THRESHOLD) {
+      data[file] = Object.assign(recordBase, {
+        status: "finished",
+        finishedAt: previous.finishedAt || now,
+        finishedBy: forceStatus === "finished" ? "manual" : "percent95"
+      });
+      saveLibrary(data);
+      updateMarkReadButton();
+      return;
+    }
+
+    if (percent >= STARTED_THRESHOLD || forceStatus === "reading") {
+      data[file] = Object.assign(recordBase, {
+        status: "reading",
+        finishedAt: null,
+        finishedBy: null
+      });
+      saveLibrary(data);
+    }
+
+    updateMarkReadButton();
+  }
+
+  function markCurrentAsRead() {
+    updateLibraryStatus("finished");
+    if (el.libraryBtn) {
+      el.libraryBtn.classList.add("activePulse");
+      window.setTimeout(function () { el.libraryBtn.classList.remove("activePulse"); }, 700);
+    }
+    libraryView = "finished";
+    renderLibrary();
+  }
+
+  function deleteLibraryItem(path) {
+    const data = getLibrary();
+    delete data[path];
+    saveLibrary(data);
+    renderLibrary();
+    updateMarkReadButton();
+  }
+
+  async function openLibraryItem(item) {
+    closeLibrary();
+    if (!item || !item.file) return;
+
+    if (item.file === file) {
+      try {
+        if (item.cfi && rendition) {
+          await rendition.display(item.cfi);
+          return;
+        }
+        if (Number.isFinite(item.percent)) {
+          await goToProgressValue(Math.round(item.percent * PROGRESS_MAX));
+          return;
+        }
+        if (Number.isFinite(item.index)) await goToIndex(item.index);
+      } catch (err) {
+        showError("ERROR abriendo elemento de Mi biblioteca:\n" + err);
+      }
+      return;
+    }
+
+    window.location.href = "/static/reader.html?file=" + encodeURIComponent(item.file);
+  }
+
+  function setLibraryView(view) {
+    libraryView = view === "finished" ? "finished" : "reading";
+    if (el.libraryReadingTab) el.libraryReadingTab.classList.toggle("active", libraryView === "reading");
+    if (el.libraryFinishedTab) el.libraryFinishedTab.classList.toggle("active", libraryView === "finished");
+    renderLibrary();
+  }
+
+  function renderLibrary() {
+    if (!el.libraryList) return;
+    const data = getLibrary();
+    const allItems = Object.keys(data).map(function (key) { return data[key]; }).filter(Boolean);
+    const items = allItems.filter(function (item) {
+      if (!item || !item.file) return false;
+      return libraryView === "finished" ? item.status === "finished" : item.status === "reading";
+    }).sort(function (a, b) {
+      const ta = libraryView === "finished" ? (a.finishedAt || a.updatedAt || 0) : (a.updatedAt || 0);
+      const tb = libraryView === "finished" ? (b.finishedAt || b.updatedAt || 0) : (b.updatedAt || 0);
+      return tb - ta;
+    });
+
+    el.libraryList.innerHTML = "";
+
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "libraryEmpty";
+      empty.textContent = libraryView === "finished"
+        ? "Todavía no hay libros leídos. Se marcarán automáticamente al llegar al 95%."
+        : "Todavía no hay libros en lectura. Al avanzar un poco aparecerán aquí.";
+      el.libraryList.appendChild(empty);
+      return;
+    }
+
+    items.forEach(function (item) {
+      const row = document.createElement("div");
+      row.className = "libraryItem";
+
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "libraryOpen";
+
+      const title = document.createElement("span");
+      title.className = "libraryTitle";
+      title.textContent = (item.status === "finished" ? "✅ " : "📘 ") + (item.title || "Libro");
+
+      const meta = document.createElement("span");
+      meta.className = "libraryMeta";
+      meta.textContent = item.chapter || item.file || "";
+
+      const bar = document.createElement("span");
+      bar.className = "libraryBar";
+      const fill = document.createElement("span");
+      fill.className = "libraryBarFill";
+      fill.style.setProperty("--progress-width", Math.round((Number(item.percent) || 0) * 100) + "%");
+      bar.appendChild(fill);
+
+      const footer = document.createElement("span");
+      footer.className = "libraryFooter";
+
+      const percent = document.createElement("span");
+      percent.className = "libraryPill";
+      percent.textContent = "📍 " + percentNumberForDisplay(item.percent) + "%";
+
+      const time = document.createElement("span");
+      time.className = "libraryPill";
+      time.textContent = (item.status === "finished" ? "🏁 " : "🕒 ") + formatBookmarkTime(item.status === "finished" ? item.finishedAt : item.updatedAt);
+
+      footer.appendChild(percent);
+      footer.appendChild(time);
+      open.appendChild(title);
+      open.appendChild(meta);
+      if (item.status !== "finished") open.appendChild(bar);
+      open.appendChild(footer);
+      open.addEventListener("click", function () { openLibraryItem(item); });
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "libraryDelete";
+      del.title = "Quitar de esta lista";
+      del.textContent = "×";
+      del.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteLibraryItem(item.file);
+      });
+
+      row.appendChild(open);
+      row.appendChild(del);
+      el.libraryList.appendChild(row);
+    });
+  }
+
+  function panelIsOpen(panel) {
+    return !!(panel && panel.classList && panel.classList.contains("open"));
+  }
+
+  function showPanel(panel) {
+    if (!panel) return;
+    panel.style.display = "flex";
+    panel.style.pointerEvents = "auto";
+    panel.setAttribute("aria-hidden", "false");
+    void panel.offsetWidth;
+    panel.classList.add("open");
+  }
+
+  function hidePanel(panel) {
+    if (!panel) return;
+    panel.classList.remove("open");
+    panel.setAttribute("aria-hidden", "true");
+    panel.style.pointerEvents = "none";
+    panel.style.display = "none";
+  }
+
+  function closeAllPanels() {
+    removeActiveTemporaryMarker();
+    closeToc();
+    closeReaders();
+    closeBookmarks();
+    closeLibrary();
+    closeBookSearch();
+    closeInstructions();
+    hideNoteDialog();
+    hideHighlightPopup();
+    if (el.overlay) el.overlay.classList.remove("show");
+  }
+
+  function openLibrary() {
+    const wasOpen = panelIsOpen(el.libraryPanel);
+    closeAllPanels();
+    if (wasOpen) return;
+    renderLibrary();
+    showPanel(el.libraryPanel);
+    el.overlay.classList.add("show");
+  }
+
+  function closeLibrary() {
+    hidePanel(el.libraryPanel);
+    el.overlay.classList.remove("show");
+  }
+
+
+  function normaliseSearchText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function contextForMatch(text, query) {
+    const clean = normaliseSearchText(text);
+    const q = normaliseSearchText(query);
+    if (!clean || !q) return "";
+    const lower = clean.toLowerCase();
+    const idx = lower.indexOf(q.toLowerCase());
+    if (idx < 0) return clean.slice(0, 240) + (clean.length > 240 ? "…" : "");
+    const start = Math.max(0, idx - 90);
+    const end = Math.min(clean.length, idx + q.length + 120);
+    let snippet = clean.slice(start, end);
+    if (start > 0) snippet = "…" + snippet;
+    if (end < clean.length) snippet += "…";
+    return snippet;
+  }
+
+  function highlightQueryInContext(context, query) {
+    const safe = escapeHtml(context);
+    const q = normaliseSearchText(query);
+    if (!q) return safe;
+    try {
+      const re = new RegExp("(" + escapeRegExp(q) + ")", "ig");
+      return safe.replace(re, "<mark>$1</mark>");
+    } catch (err) {
+      return safe;
+    }
+  }
+
+  function openBookSearch() {
+    const wasOpen = panelIsOpen(el.bookSearchPanel);
+    closeAllPanels();
+    if (wasOpen) return;
+    showPanel(el.bookSearchPanel);
+    el.overlay.classList.add("show");
+
+    window.setTimeout(function () {
+      if (el.bookSearchInput) el.bookSearchInput.focus();
+    }, 50);
+  }
+
+  function resetBookSearch() {
+    bookSearchGeneration += 1;
+    if (el.bookSearchInput) el.bookSearchInput.value = "";
+    renderBookSearchMessage("Escribe una frase para buscar dentro del EPUB abierto.");
+  }
+
+  function closeBookSearch() {
+    resetBookSearch();
+    hidePanel(el.bookSearchPanel);
+    el.overlay.classList.remove("show");
+  }
+
+  function renderBookSearchMessage(message) {
+    if (!el.bookSearchList) return;
+    el.bookSearchList.innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "bookSearchEmpty";
+    div.textContent = message;
+    el.bookSearchList.appendChild(div);
+  }
+
+  function renderBookSearchResults(results, query) {
+    if (!el.bookSearchList) return;
+    el.bookSearchList.innerHTML = "";
+
+    if (!results.length) {
+      renderBookSearchMessage("No se encontraron coincidencias en este libro.");
+      return;
+    }
+
+    results.forEach(function (item, idx) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "bookSearchItem";
+
+      const title = document.createElement("span");
+      title.className = "bookSearchTitle";
+      title.textContent = "Resultado " + (idx + 1);
+
+      const context = document.createElement("span");
+      context.className = "bookSearchContext";
+      context.innerHTML = highlightQueryInContext(item.context || item.text || "", query);
+
+      const meta = document.createElement("span");
+      meta.className = "bookSearchMeta";
+
+      const section = document.createElement("span");
+      section.className = "bookSearchPill";
+      section.textContent = "📖 Sección " + ((Number(item.index) || 0) + 1);
+
+      const where = document.createElement("span");
+      where.className = "bookSearchPill";
+      where.textContent = item.label || "Abrir coincidencia";
+
+      meta.appendChild(section);
+      meta.appendChild(where);
+
+      btn.appendChild(title);
+      btn.appendChild(context);
+      btn.appendChild(meta);
+      btn.addEventListener("click", async function () {
+        closeBookSearch();
+        try {
+          if (item.cfi && rendition) {
+            await rendition.display(item.cfi);
+          } else if (item.href && rendition) {
+            await rendition.display(item.href);
+          } else if (Number.isFinite(item.index)) {
+            await goToIndex(item.index);
+          }
+        } catch (err) {
+          showError("ERROR abriendo resultado de búsqueda:\n" + err);
+        }
+      });
+
+      el.bookSearchList.appendChild(btn);
+    });
+  }
+
+  async function loadSpineDocument(item) {
+    if (!item || !book) return null;
+    try {
+      if (item.document) return item.document;
+      if (item.load) {
+        await item.load(book.load.bind(book));
+        if (item.document) return item.document;
+      }
+    } catch (err) {
+      console.warn("No se pudo cargar sección para búsqueda", err);
+    }
+    return null;
+  }
+
+  async function searchCurrentBook() {
+    const searchToken = ++bookSearchGeneration;
+    const query = normaliseSearchText(el.bookSearchInput ? el.bookSearchInput.value : "");
+    if (!query) {
+      renderBookSearchMessage("Escribe una frase para buscar dentro del EPUB abierto.");
+      return;
+    }
+    if (!book || !spineItems.length) {
+      renderBookSearchMessage("El libro todavía no está listo.");
+      return;
+    }
+
+    renderBookSearchMessage("Buscando en el libro…");
+    const results = [];
+    const qLower = query.toLowerCase();
+    const maxResults = 80;
+
+    for (let i = 0; i < spineItems.length && results.length < maxResults; i += 1) {
+      if (searchToken !== bookSearchGeneration) return;
+      const item = spineItems[i];
+      const doc = await loadSpineDocument(item);
+      if (searchToken !== bookSearchGeneration) return;
+      if (!doc || !doc.body) continue;
+
+      const nodes = Array.from(doc.body.querySelectorAll("p, li, blockquote, h1, h2, h3, h4, h5, h6, div"));
+      const seen = new Set();
+
+      for (let n = 0; n < nodes.length && results.length < maxResults; n += 1) {
+        const node = nodes[n];
+        const raw = normaliseSearchText(node.textContent || "");
+        if (!raw || raw.length < query.length) continue;
+        if (raw.toLowerCase().indexOf(qLower) < 0) continue;
+
+        const context = contextForMatch(raw, query);
+        if (seen.has(context)) continue;
+        seen.add(context);
+
+        let cfi = "";
+        try {
+          if (item.cfiFromElement) cfi = item.cfiFromElement(node);
+        } catch (err) {
+          cfi = "";
+        }
+
+        results.push({
+          index: i,
+          href: item.href || item.url || "",
+          cfi: cfi,
+          text: raw,
+          context: context,
+          label: findTocLabel({ start: { href: item.href || item.url || "" } }) || (item.href || "Sección")
+        });
+      }
+    }
+
+    if (searchToken !== bookSearchGeneration) return;
+    renderBookSearchResults(results, query);
+    if (el.bookSearchBtn) {
+      el.bookSearchBtn.classList.add("activePulse");
+      window.setTimeout(function () { el.bookSearchBtn.classList.remove("activePulse"); }, 700);
+    }
+  }
+
+
+  function removeActiveTemporaryMarker() {
+    if (!rendition || !rendition.annotations || !activeTemporaryMarker || !activeTemporaryMarker.cfi) {
+      activeTemporaryMarker = null;
+      return;
+    }
+    try {
+      rendition.annotations.remove(activeTemporaryMarker.cfi, "underline");
+    } catch (err) {}
+    activeTemporaryMarker = null;
+  }
+
+  function activeMarkerStyles() {
+    return {
+      "stroke": "#000000",
+      "stroke-width": "2.4",
+      "stroke-opacity": "1",
+      "fill": "transparent",
+      "fill-opacity": "0",
+      "opacity": "1",
+      "mix-blend-mode": "normal",
+      "pointer-events": "none"
+    };
+  }
+
+  function addActiveTemporaryMarker(item) {
+    removeActiveTemporaryMarker();
+    if (!rendition || !rendition.annotations || !item || !item.cfi) return;
+
+    // Funciona mejor con CFI de rango: resaltados y notas. En marcadores de lugar
+    // se intenta igualmente; si el EPUB.js no puede subrayar un punto exacto, no pasa nada.
+    try {
+      activeTemporaryMarker = { cfi: item.cfi };
+      if (rendition.annotations.underline) {
+        rendition.annotations.underline(
+          item.cfi,
+          { active: true },
+          function () {},
+          "wv-active-temporary-underline",
+          activeMarkerStyles()
+        );
+      } else if (rendition.annotations.highlight) {
+        rendition.annotations.highlight(
+          item.cfi,
+          { active: true },
+          function () {},
+          "wv-active-temporary-underline",
+          activeMarkerStyles()
+        );
+      }
+    } catch (err) {
+      activeTemporaryMarker = null;
+      console.warn("No se pudo añadir subrayado temporal", err);
+    }
+  }
+
+  async function openItemAndUnderline(item, fallbackFn, errorPrefix) {
+    removeActiveTemporaryMarker();
+    closeBookmarks();
+    try {
+      if (item && item.cfi && rendition) {
+        await rendition.display(item.cfi);
+        window.setTimeout(function () { addActiveTemporaryMarker(item); }, 180);
+        return;
+      }
+      if (item && Number.isFinite(item.percent)) {
+        await goToProgressValue(Math.round(item.percent * PROGRESS_MAX));
+        window.setTimeout(function () { addActiveTemporaryMarker(item); }, 180);
+        return;
+      }
+      if (item && Number.isFinite(item.index)) {
+        await goToIndex(item.index);
+        window.setTimeout(function () { addActiveTemporaryMarker(item); }, 180);
+        return;
+      }
+      if (fallbackFn) await fallbackFn();
+    } catch (err) {
+      showError((errorPrefix || "ERROR abriendo elemento") + ":\n" + err);
+    }
+  }
+
+
+
+
+  function webvaultProfileKeys() {
+    const prefixes = [
+      "webvault.reader.",
+      "webvault.bookmarks.",
+      "webvault.highlights.",
+      "webvault.notes.",
+      "webvault.library."
+    ];
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && prefixes.some(function (prefix) { return key.indexOf(prefix) === 0; })) {
+        keys.push(key);
+      }
+    }
+    return keys.sort();
+  }
+
+  function exportReaderProfile() {
+    try {
+      const keys = webvaultProfileKeys();
+      const data = {};
+      keys.forEach(function (key) {
+        data[key] = localStorage.getItem(key);
+      });
+
+      const payload = {
+        type: "webvault.reader.profile",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        currentFile: file || null,
+        items: data
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      a.href = url;
+      a.download = "webvault-reader-profile-" + stamp + ".json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 500);
+    } catch (err) {
+      showError("ERROR exportando perfil WebVault:\n" + err);
+    }
+  }
+
+  function importReaderProfileFromFile(fileObj) {
+    if (!fileObj) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      try {
+        const payload = JSON.parse(String(reader.result || "{}"));
+        const items = payload && payload.items && typeof payload.items === "object" ? payload.items : null;
+        if (payload.type !== "webvault.reader.profile" || !items) {
+          showError("ERROR: el archivo no parece un perfil válido de WebVault Reader.");
+          return;
+        }
+
+        const count = Object.keys(items).length;
+        const ok = window.confirm(
+          "Importar este perfil sustituirá los datos locales actuales de WebVault Reader en este navegador.\n\n" +
+          "Elementos a importar: " + count + "\n\n" +
+          "¿Continuar?"
+        );
+        if (!ok) return;
+
+        webvaultProfileKeys().forEach(function (key) { localStorage.removeItem(key); });
+        Object.keys(items).forEach(function (key) {
+          if (key.indexOf("webvault.") === 0 && typeof items[key] === "string") {
+            localStorage.setItem(key, items[key]);
+          }
+        });
+
+        window.alert("Perfil WebVault importado. Se recargará el lector para aplicar los cambios.");
+        window.location.reload();
+      } catch (err) {
+        showError("ERROR importando perfil WebVault:\n" + err);
+      } finally {
+        if (el.profileImportFile) el.profileImportFile.value = "";
+      }
+    };
+    reader.onerror = function () {
+      showError("ERROR leyendo el archivo de perfil WebVault.");
+      if (el.profileImportFile) el.profileImportFile.value = "";
+    };
+    reader.readAsText(fileObj);
+  }
+
+  function openInstructions() {
+    const wasOpen = panelIsOpen(el.instructionsPanel);
+    closeAllPanels();
+    if (wasOpen) return;
+    showPanel(el.instructionsPanel);
+    el.overlay.classList.add("show");
+    if (el.instructionsBtn) {
+      el.instructionsBtn.classList.add("activePulse");
+      window.setTimeout(function () { el.instructionsBtn.classList.remove("activePulse"); }, 700);
+    }
+  }
+
+  function closeInstructions() {
+    hidePanel(el.instructionsPanel);
+    el.overlay.classList.remove("show");
+  }
+
+
+  function getBookmarks() {
+    try {
+      const items = JSON.parse(localStorage.getItem(bookmarksKey) || "[]");
+      return Array.isArray(items) ? items : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function saveBookmarks(items) {
+    try {
+      localStorage.setItem(bookmarksKey, JSON.stringify(items || []));
+    } catch (err) {
+      showError("No se pudieron guardar los marcadores en localStorage:\n" + err);
+    }
+  }
+
+
+  function getHighlights() {
+    try {
+      const items = JSON.parse(localStorage.getItem(highlightsKey) || "[]");
+      return Array.isArray(items) ? items : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function saveHighlights(items) {
+    try {
+      localStorage.setItem(highlightsKey, JSON.stringify(items || []));
+    } catch (err) {
+      showError("No se pudieron guardar los resaltados en localStorage:\n" + err);
+    }
+  }
+
+
+  function setSelectedNoteColor(colorName) {
+    selectedNoteColor = HIGHLIGHT_COLORS[colorName] ? colorName : "yellow";
+    document.querySelectorAll(".noteColor").forEach(function (btn) {
+      btn.classList.toggle("active", btn.dataset.color === selectedNoteColor);
+    });
+  }
+
+  function noteColorSolid(colorName) {
+    const info = HIGHLIGHT_COLORS[colorName] || HIGHLIGHT_COLORS.yellow;
+    return info.solid;
+  }
+
+  function noteColorLabel(colorName) {
+    const info = HIGHLIGHT_COLORS[colorName] || HIGHLIGHT_COLORS.yellow;
+    return info.label;
+  }
+
+  function getNotes() {
+    try {
+      const items = JSON.parse(localStorage.getItem(notesKey) || "[]");
+      return Array.isArray(items) ? items : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function saveNotes(items) {
+    try {
+      localStorage.setItem(notesKey, JSON.stringify(items || []));
+    } catch (err) {
+      showError("No se pudieron guardar las notas en localStorage:\n" + err);
+    }
+  }
+
+  function openNoteDialogFromSelection() {
+    if (!pendingHighlight || !pendingHighlight.cfi || !pendingHighlight.text) {
+      if (!getCurrentSelectionAsHighlight()) {
+        showSelectTextHint();
+        return;
+      }
+    }
+
+    pendingNote = Object.assign({}, pendingHighlight || {});
+    setSelectedNoteColor("yellow");
+    if (el.noteSelectedText) el.noteSelectedText.textContent = pendingNote.text || "Texto seleccionado";
+    if (el.noteText) {
+      el.noteText.value = "";
+      window.setTimeout(function () { el.noteText.focus(); }, 50);
+    }
+    if (el.noteDialog) el.noteDialog.classList.add("open");
+  }
+
+  function hideNoteDialog() {
+    pendingNote = null;
+    if (el.noteDialog) el.noteDialog.classList.remove("open");
+    if (el.noteText) el.noteText.value = "";
+    setSelectedNoteColor("yellow");
+  }
+
+  function saveCurrentNote() {
+    if (!pendingNote || !pendingNote.cfi) return;
+    const noteText = String(el.noteText && el.noteText.value || "").trim();
+    if (!noteText) {
+      if (el.noteText) el.noteText.focus();
+      return;
+    }
+
+    const item = {
+      id: String(Date.now()) + "-" + Math.random().toString(16).slice(2),
+      cfi: pendingNote.cfi,
+      text: pendingNote.text || "",
+      note: noteText,
+      color: selectedNoteColor || "yellow",
+      chapter: pendingNote.chapter || (el.chapter && el.chapter.textContent || "").trim(),
+      percent: Number(pendingNote.percent) || Number(currentPercent) || 0,
+      index: Number(pendingNote.index) || Number(currentIndex) || 0,
+      createdAt: Date.now()
+    };
+
+    const items = getNotes();
+    items.unshift(item);
+    saveNotes(items.slice(0, 300));
+    applyNoteHighlight(item);
+
+    hideNoteDialog();
+    hideHighlightPopup();
+    clearEpubSelection();
+    renderBookmarks();
+
+    if (el.bookmarksBtn) {
+      el.bookmarksBtn.classList.add("activePulse");
+      window.setTimeout(function () { el.bookmarksBtn.classList.remove("activePulse"); }, 700);
+    }
+  }
+
+  function deleteNote(id) {
+    const notes = getNotes();
+    const found = notes.find(function (item) { return item.id === id; });
+
+    if (found && rendition && rendition.annotations && found.cfi) {
+      try { rendition.annotations.remove(found.cfi, "highlight"); } catch (err) {}
+
+      // Si había un resaltado normal en la misma frase, lo restauramos al borrar la nota.
+      const fallbackHighlight = getHighlights().find(function (item) {
+        return item && item.cfi === found.cfi;
+      });
+      if (fallbackHighlight) applyHighlight(fallbackHighlight);
+    }
+
+    saveNotes(notes.filter(function (item) { return item.id !== id; }));
+    renderBookmarks();
+  }
+
+  async function goToNote(item) {
+    await openItemAndUnderline(item, null, "ERROR abriendo nota");
+  }
+
+  const HIGHLIGHT_COLORS = {
+    yellow: { solid: "#facc15", alpha: 0.24, label: "Amarillo" },
+    green:  { solid: "#86efac", alpha: 0.22, label: "Verde" },
+    blue:   { solid: "#93c5fd", alpha: 0.20, label: "Azul" },
+    pink:   { solid: "#f9a8d4", alpha: 0.22, label: "Rosa" },
+    orange: { solid: "#fdba74", alpha: 0.22, label: "Naranja" }
+  };
+
+  function normaliseSelectionText(text) {
+    let s = String(text || "").replace(/\s+/g, " ").trim();
+    if (!s) return "";
+    if (s.length > 320) s = s.slice(0, 317).trim() + "…";
+    return s;
+  }
+
+  function highlightStyles(colorName) {
+    const info = HIGHLIGHT_COLORS[colorName] || HIGHLIGHT_COLORS.yellow;
+
+    // EPUB.js dibuja los resaltados como rectángulos SVG.
+    // Para evitar zonas opacas, NO usamos rgba como fill. Usamos color sólido
+    // + fill-opacity bajo. Además, antes de redibujar eliminamos la anotación
+    // previa para que no se acumulen capas al cambiar de página/tema.
+    return {
+      "fill": info.solid,
+      "fill-opacity": String(info.alpha),
+      "opacity": "1",
+      "stroke": info.solid,
+      "stroke-opacity": "0",
+      "stroke-width": "0",
+      "mix-blend-mode": "normal",
+      "pointer-events": "none"
+    };
+  }
+
+  function removeRenderedHighlight(item) {
+    if (!rendition || !rendition.annotations || !item || !item.cfi) return;
+    try {
+      rendition.annotations.remove(item.cfi, "highlight");
+    } catch (err) {
+      // Algunas versiones de EPUB.js lanzan error si aún no existe. Es inocuo.
+    }
+  }
+
+  function applyHighlight(item) {
+    if (!rendition || !rendition.annotations || !item || !item.cfi) return;
+    try {
+      removeRenderedHighlight(item);
+      rendition.annotations.highlight(
+        item.cfi,
+        { id: item.id, color: item.color || "yellow" },
+        function () { goToHighlight(item); },
+        "wv-highlight-" + (item.color || "yellow"),
+        highlightStyles(item.color || "yellow")
+      );
+    } catch (err) {
+      console.warn("No se pudo aplicar resaltado", err);
+    }
+  }
+
+  function applyAllHighlights() {
+    getHighlights().forEach(applyHighlight);
+  }
+
+  function removeRenderedNoteHighlight(item) {
+    if (!rendition || !rendition.annotations || !item || !item.cfi) return;
+    try {
+      rendition.annotations.remove(item.cfi, "highlight");
+    } catch (err) {
+      // Inocuo si la anotación aún no estaba renderizada.
+    }
+  }
+
+  function applyNoteHighlight(item) {
+    if (!rendition || !rendition.annotations || !item || !item.cfi) return;
+    try {
+      // Una nota también sombrea el texto seleccionado con su propio color.
+      // Si existe un resaltado normal en el mismo CFI, la nota tiene prioridad visual.
+      removeRenderedNoteHighlight(item);
+      rendition.annotations.highlight(
+        item.cfi,
+        { id: item.id, color: item.color || "yellow", note: true },
+        function () { goToNote(item); },
+        "wv-note-highlight-" + (item.color || "yellow"),
+        highlightStyles(item.color || "yellow")
+      );
+    } catch (err) {
+      console.warn("No se pudo aplicar sombreado de nota", err);
+    }
+  }
+
+  function applyAllNoteHighlights() {
+    getNotes().forEach(applyNoteHighlight);
+  }
+
+  function clearEpubSelection() {
+    try {
+      if (!rendition || !rendition.getContents) return;
+      rendition.getContents().forEach(function (content) {
+        if (content && content.window && content.window.getSelection) {
+          content.window.getSelection().removeAllRanges();
+        }
+      });
+    } catch (err) {}
+  }
+
+  function enterHighlightSelectMode() {
+    highlightSelectMode = true;
+    const main = document.getElementById("main");
+    if (main) main.classList.add("highlightSelectMode");
+    if (el.highlightsBtn) {
+      el.highlightsBtn.textContent = "Selecciona texto…";
+      el.highlightsBtn.classList.add("activePulse");
+    }
+    if (el.flipbookStatus) {
+      el.flipbookStatus.textContent = "Modo resaltado · selecciona texto dentro del libro";
+    }
+  }
+
+  function exitHighlightSelectMode() {
+    highlightSelectMode = false;
+    const main = document.getElementById("main");
+    if (main) main.classList.remove("highlightSelectMode");
+    if (el.highlightsBtn) {
+      el.highlightsBtn.textContent = "🖍️ Resaltar";
+      el.highlightsBtn.classList.remove("activePulse");
+    }
+    if (el.flipbookStatus) {
+      el.flipbookStatus.textContent = readerMode === "flipbook"
+        ? "Modo FlipBook EPUB.js · texto refluible"
+        : "";
+    }
+  }
+
+  function showHighlightPopup(cfiRange, selectedText) {
+    const text = normaliseSelectionText(selectedText);
+    if (!cfiRange || !text) return;
+    exitHighlightSelectMode();
+    pendingHighlight = {
+      cfi: cfiRange,
+      text: text,
+      chapter: (el.chapter && el.chapter.textContent || "").trim(),
+      percent: Number(currentPercent) || 0,
+      index: Number(currentIndex) || 0
+    };
+    if (el.highlightPopup) el.highlightPopup.classList.add("open");
+  }
+
+  function hideHighlightPopup() {
+    pendingHighlight = null;
+    exitHighlightSelectMode();
+    if (el.highlightPopup) el.highlightPopup.classList.remove("open");
+    clearEpubSelection();
+  }
+
+  function getCurrentSelectionAsHighlight() {
+    if (!rendition || !rendition.getContents) return false;
+
+    try {
+      const contents = rendition.getContents();
+
+      for (let i = 0; i < contents.length; i += 1) {
+        const content = contents[i];
+        if (!content || !content.window || !content.window.getSelection) continue;
+
+        const selection = content.window.getSelection();
+        if (!selection || selection.isCollapsed || selection.rangeCount === 0) continue;
+
+        const text = normaliseSelectionText(selection.toString());
+        if (!text) continue;
+
+        const range = selection.getRangeAt(0);
+        let cfiRange = "";
+
+        try {
+          if (content.cfiFromRange) {
+            cfiRange = content.cfiFromRange(range);
+          }
+        } catch (err) {
+          cfiRange = "";
+        }
+
+        if (!cfiRange && rendition.currentLocation && rendition.currentLocation()) {
+          const loc = rendition.currentLocation();
+          cfiRange = loc && loc.start && loc.start.cfi ? loc.start.cfi : "";
+        }
+
+        if (!cfiRange) return false;
+
+        showHighlightPopup(cfiRange, text);
+        return true;
+      }
+    } catch (err) {
+      console.warn("No se pudo leer la selección actual", err);
+    }
+
+    return false;
+  }
+
+  function showSelectTextHint() {
+    if (!el.highlightsBtn) return;
+    const oldText = el.highlightsBtn.textContent;
+    el.highlightsBtn.textContent = "Selecciona texto";
+    el.highlightsBtn.classList.add("activePulse");
+    window.setTimeout(function () {
+      el.highlightsBtn.textContent = oldText;
+      el.highlightsBtn.classList.remove("activePulse");
+    }, 1100);
+  }
+
+  function openHighlightChooser() {
+    closeToc();
+    closeReaders();
+    closeBookmarks();
+
+    if (getCurrentSelectionAsHighlight()) return;
+
+    enterHighlightSelectMode();
+    showSelectTextHint();
+  }
+
+  function addHighlight(colorName) {
+    if (!pendingHighlight || !pendingHighlight.cfi) return;
+    const safeColor = HIGHLIGHT_COLORS[colorName] ? colorName : "yellow";
+    const item = {
+      id: String(Date.now()) + "-" + Math.random().toString(16).slice(2),
+      cfi: pendingHighlight.cfi,
+      text: pendingHighlight.text,
+      color: safeColor,
+      chapter: pendingHighlight.chapter,
+      percent: pendingHighlight.percent,
+      index: pendingHighlight.index,
+      createdAt: Date.now()
+    };
+
+    const items = getHighlights();
+    const duplicate = items.some(function (old) { return old.cfi === item.cfi; });
+    if (!duplicate) {
+      items.unshift(item);
+      saveHighlights(items.slice(0, 300));
+      applyHighlight(item);
+    }
+
+    hideHighlightPopup();
+    renderBookmarks();
+    if (el.highlightsBtn) {
+      el.highlightsBtn.classList.add("activePulse");
+      window.setTimeout(function () { el.highlightsBtn.classList.remove("activePulse"); }, 700);
+    }
+  }
+
+  function deleteHighlight(id) {
+    const items = getHighlights();
+    const found = items.find(function (item) { return item.id === id; });
+    if (found && rendition && rendition.annotations && found.cfi) {
+      try { rendition.annotations.remove(found.cfi, "highlight"); } catch (err) {}
+    }
+    saveHighlights(items.filter(function (item) { return item.id !== id; }));
+    renderBookmarks();
+  }
+
+  async function goToHighlight(item) {
+    await openItemAndUnderline(item, null, "ERROR abriendo resaltado");
+  }
+
+  function formatBookmarkTime(ts) {
+    try {
+      return new Date(ts).toLocaleString();
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function currentBookmarkLabel() {
+    const chapter = (el.chapter && el.chapter.textContent || "").trim();
+    const percentText = Math.round((currentPercent || 0) * 1000) / 10;
+    if (chapter && chapter !== "Cargando…") {
+      return chapter + " · " + percentText.toFixed(percentText % 1 === 0 ? 0 : 1) + "%";
+    }
+    return "Marcador · " + percentText.toFixed(percentText % 1 === 0 ? 0 : 1) + "%";
+  }
+
+
+  function normaliseExcerpt(text) {
+    let s = String(text || "").replace(/\s+/g, " ").trim();
+    if (!s) return "";
+    if (s.length > 230) s = s.slice(0, 227).trim() + "…";
+    if (s.length < 20) return "";
+    if (!s.startsWith("…") && !s.startsWith("\"")) s = "…" + s;
+    if (!s.endsWith("…") && !/[.!?…]$/.test(s)) s = s + "…";
+    return s;
+  }
+
+  function getVisibleTextExcerpt() {
+    try {
+      if (!rendition || !rendition.getContents) return "";
+      const contents = rendition.getContents();
+      if (!contents || !contents.length) return "";
+
+      for (let c = 0; c < contents.length; c += 1) {
+        const doc = contents[c].document;
+        if (!doc || !doc.body) continue;
+        const viewportH = doc.defaultView ? doc.defaultView.innerHeight : 0;
+        const viewportW = doc.defaultView ? doc.defaultView.innerWidth : 0;
+        const nodes = Array.from(doc.body.querySelectorAll("p, li, blockquote, h1, h2, h3, h4, div"));
+
+        for (let i = 0; i < nodes.length; i += 1) {
+          const node = nodes[i];
+          const text = normaliseExcerpt(node.textContent || "");
+          if (!text) continue;
+
+          try {
+            const rect = node.getBoundingClientRect();
+            const visibleY = !viewportH || (rect.bottom > 20 && rect.top < viewportH - 20);
+            const visibleX = !viewportW || (rect.right > 0 && rect.left < viewportW);
+            if (visibleY && visibleX) return text;
+          } catch (err) {
+            return text;
+          }
+        }
+
+        const fallback = normaliseExcerpt(doc.body.innerText || doc.body.textContent || "");
+        if (fallback) return fallback;
+      }
+    } catch (err) {
+      console.warn("No se pudo extraer frase del marcador", err);
+    }
+    return "";
+  }
+
+  function addBookmark() {
+    if (!file) {
+      showError("ERROR: falta el parámetro file en la URL.");
+      return;
+    }
+
+    const bookmark = {
+      id: String(Date.now()) + "-" + Math.random().toString(16).slice(2),
+      label: "❤️ Lugar guardado",
+      cfi: currentCfi || null,
+      percent: Number(currentPercent) || 0,
+      index: Number(currentIndex) || 0,
+      chapter: (el.chapter && el.chapter.textContent || "").trim(),
+      excerpt: getVisibleTextExcerpt(),
+      createdAt: Date.now()
+    };
+
+    const items = getBookmarks();
+
+    const duplicate = items.some(function (item) {
+      if (bookmark.cfi && item.cfi) return item.cfi === bookmark.cfi;
+      return Math.abs((Number(item.percent) || 0) - bookmark.percent) < 0.002;
+    });
+
+    if (!duplicate) {
+      items.unshift(bookmark);
+      saveBookmarks(items.slice(0, 200));
+    }
+
+    renderBookmarks();
+    if (el.bookmarksBtn) {
+      el.bookmarksBtn.classList.add("activePulse");
+      window.setTimeout(function () { el.bookmarksBtn.classList.remove("activePulse"); }, 700);
+    }
+  }
+
+  function deleteBookmark(id) {
+    const items = getBookmarks().filter(function (item) { return item.id !== id; });
+    saveBookmarks(items);
+    renderBookmarks();
+  }
+
+  async function goToBookmark(item) {
+    await openItemAndUnderline(item, null, "ERROR abriendo marcador");
+  }
+
+  function getNoteSearchQuery() {
+    return normaliseSearchText(el.bookmarkSearchInput ? el.bookmarkSearchInput.value : "").toLowerCase();
+  }
+
+  function noteMatchesSearch(item, query) {
+    if (!query) return true;
+    const haystack = normaliseSearchText([
+      item.note || "",
+      item.text || "",
+      item.chapter || "",
+      noteColorLabel(item.color || "yellow")
+    ].join(" ")).toLowerCase();
+    return haystack.indexOf(query) >= 0;
+  }
+
+  function renderBookmarks() {
+    if (!el.bookmarkList) return;
+    const marks = getBookmarks();
+    const highlights = getHighlights();
+    const allNotes = getNotes();
+    const noteQuery = getNoteSearchQuery();
+    const notes = allNotes.filter(function (item) { return noteMatchesSearch(item, noteQuery); });
+    el.bookmarkList.innerHTML = "";
+
+    if (!marks.length && !highlights.length && !allNotes.length) {
+      const empty = document.createElement("div");
+      empty.className = "bookmarkEmpty";
+      empty.textContent = "Este libro todavía no tiene marcadores, resaltados ni notas. Usa ❤️ Recordar para guardar un lugar. Para resaltar o anotar: selecciona texto del libro y pulsa 🖍️ Resaltar o 📝 Nota.";
+      el.bookmarkList.appendChild(empty);
+      return;
+    }
+
+    if (noteQuery) {
+      const hint = document.createElement("div");
+      hint.className = "bookmarkSearchHint";
+      hint.textContent = notes.length
+        ? "🔍 Notas encontradas: " + notes.length + " de " + allNotes.length
+        : "🔍 No hay notas que coincidan con la búsqueda.";
+      el.bookmarkList.appendChild(hint);
+    }
+
+    if (marks.length) {
+      const section = document.createElement("div");
+      section.className = "bookmarkSectionTitle";
+      section.textContent = "❤️ Lugares guardados";
+      el.bookmarkList.appendChild(section);
+    }
+
+    marks.forEach(function (item) {
+      const row = document.createElement("div");
+      row.className = "bookmarkItem";
+
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "bookmarkOpen";
+
+      const title = document.createElement("span");
+      title.className = "bookmarkTitle";
+      title.textContent = item.label || "Marcador";
+
+      const meta = document.createElement("span");
+      meta.className = "bookmarkMeta";
+      meta.textContent = item.chapter || "Lugar guardado";
+
+      const excerpt = document.createElement("span");
+      excerpt.className = "bookmarkExcerpt";
+      excerpt.textContent = item.excerpt || "…Sin frase disponible en esta posición…";
+
+      const footer = document.createElement("span");
+      footer.className = "bookmarkFooter";
+
+      const percent = document.createElement("span");
+      percent.className = "bookmarkPill";
+      const p = Math.round((Number(item.percent) || 0) * 1000) / 10;
+      percent.textContent = "📍 " + p.toFixed(p % 1 === 0 ? 0 : 1) + "%";
+
+      const time = document.createElement("span");
+      time.className = "bookmarkPill";
+      time.textContent = "🕒 " + formatBookmarkTime(item.createdAt);
+
+      footer.appendChild(percent);
+      footer.appendChild(time);
+      open.appendChild(title);
+      open.appendChild(meta);
+      open.appendChild(excerpt);
+      open.appendChild(footer);
+      open.addEventListener("click", function () { goToBookmark(item); });
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "bookmarkDelete";
+      del.title = "Borrar marcador";
+      del.textContent = "×";
+      del.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteBookmark(item.id);
+      });
+
+      row.appendChild(open);
+      row.appendChild(del);
+      el.bookmarkList.appendChild(row);
+    });
+
+    if (highlights.length) {
+      const section = document.createElement("div");
+      section.className = "bookmarkSectionTitle";
+      section.textContent = "🖍️ Resaltados";
+      el.bookmarkList.appendChild(section);
+    }
+
+    highlights.forEach(function (item) {
+      const colorInfo = HIGHLIGHT_COLORS[item.color] || HIGHLIGHT_COLORS.yellow;
+      const row = document.createElement("div");
+      row.className = "bookmarkItem highlightItem";
+      row.style.setProperty("--hl-color", colorInfo.solid);
+
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "bookmarkOpen";
+
+      const title = document.createElement("span");
+      title.className = "bookmarkTitle";
+      title.innerHTML = '<span class="highlightSwatch"></span>Resaltado · ' + colorInfo.label;
+
+      const meta = document.createElement("span");
+      meta.className = "bookmarkMeta";
+      meta.textContent = item.chapter || "Texto resaltado";
+
+      const excerpt = document.createElement("span");
+      excerpt.className = "bookmarkExcerpt";
+      excerpt.textContent = item.text || "…Texto resaltado…";
+
+      const footer = document.createElement("span");
+      footer.className = "bookmarkFooter";
+
+      const percent = document.createElement("span");
+      percent.className = "bookmarkPill";
+      const p = Math.round((Number(item.percent) || 0) * 1000) / 10;
+      percent.textContent = "📍 " + p.toFixed(p % 1 === 0 ? 0 : 1) + "%";
+
+      const time = document.createElement("span");
+      time.className = "bookmarkPill";
+      time.textContent = "🕒 " + formatBookmarkTime(item.createdAt);
+
+      footer.appendChild(percent);
+      footer.appendChild(time);
+      open.appendChild(title);
+      open.appendChild(meta);
+      open.appendChild(excerpt);
+      open.appendChild(footer);
+      open.addEventListener("click", function () { goToHighlight(item); });
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "bookmarkDelete";
+      del.title = "Borrar resaltado";
+      del.textContent = "×";
+      del.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteHighlight(item.id);
+      });
+
+      row.appendChild(open);
+      row.appendChild(del);
+      el.bookmarkList.appendChild(row);
+    });
+
+    if (notes.length) {
+      const section = document.createElement("div");
+      section.className = "bookmarkSectionTitle";
+      section.textContent = noteQuery ? "📝 Notas encontradas" : "📝 Notas";
+      el.bookmarkList.appendChild(section);
+    }
+
+    notes.forEach(function (item) {
+      const row = document.createElement("div");
+      row.className = "bookmarkItem noteItem";
+      row.style.setProperty("--note-color", noteColorSolid(item.color || "yellow"));
+
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "bookmarkOpen";
+
+      const title = document.createElement("span");
+      title.className = "bookmarkTitle";
+      title.textContent = "📝 Nota · " + noteColorLabel(item.color || "yellow");
+
+      const meta = document.createElement("span");
+      meta.className = "bookmarkMeta";
+      meta.textContent = item.chapter || "Nota del libro";
+
+      const excerpt = document.createElement("span");
+      excerpt.className = "bookmarkExcerpt";
+      excerpt.textContent = item.text || "…Texto anotado…";
+
+      const note = document.createElement("span");
+      note.className = "noteTextBlock";
+      note.textContent = item.note || "";
+
+      const footer = document.createElement("span");
+      footer.className = "bookmarkFooter";
+
+      const percent = document.createElement("span");
+      percent.className = "bookmarkPill";
+      const p = Math.round((Number(item.percent) || 0) * 1000) / 10;
+      percent.textContent = "📍 " + p.toFixed(p % 1 === 0 ? 0 : 1) + "%";
+
+      const time = document.createElement("span");
+      time.className = "bookmarkPill";
+      time.textContent = "🕒 " + formatBookmarkTime(item.createdAt);
+
+      footer.appendChild(percent);
+      footer.appendChild(time);
+      open.appendChild(title);
+      open.appendChild(meta);
+      open.appendChild(excerpt);
+      open.appendChild(note);
+      open.appendChild(footer);
+      open.addEventListener("click", function () { goToNote(item); });
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "bookmarkDelete";
+      del.title = "Borrar nota";
+      del.textContent = "×";
+      del.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteNote(item.id);
+      });
+
+      row.appendChild(open);
+      row.appendChild(del);
+      el.bookmarkList.appendChild(row);
+    });
+  }
+
+  function openBookmarks() {
+    const wasOpen = panelIsOpen(el.bookmarkPanel);
+    closeAllPanels();
+    if (wasOpen) return;
+    renderBookmarks();
+    showPanel(el.bookmarkPanel);
+    el.overlay.classList.add("show");
+  }
+
+  function closeBookmarks() {
+    hidePanel(el.bookmarkPanel);
+    el.overlay.classList.remove("show");
+  }
+
+  function clamp(num, min, max) {
+    return Math.max(min, Math.min(max, num));
+  }
+
+  function applyTheme(theme) {
+    const safeTheme = ["light", "dark", "sepia"].includes(theme) ? theme : "sepia";
+    el.root.setAttribute("data-theme", safeTheme);
+    el.theme.value = safeTheme;
+    saveState({ theme: safeTheme });
+    applyBookTheme();
+  }
+
+  function applyFontSize(size) {
+    const safeSize = clamp(Number(size) || DEFAULT_FONT_SIZE, MIN_FONT_SIZE, MAX_FONT_SIZE);
+    if (rendition && rendition.themes) {
+      rendition.themes.fontSize(safeSize + "%");
+    }
+    saveState({ fontSize: safeSize });
+  }
+
+  function getCssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function applyBookTheme() {
+    if (!rendition || !rendition.themes) return;
+    const bodyBackground = getCssVar("--reader-bg") || "#f4f1ea";
+    const bodyColor = getCssVar("--reader-fg") || "#1c1c1c";
+    rendition.themes.register("webvault", {
+      body: {
+        "background": bodyBackground + " !important",
+        "color": bodyColor + " !important",
+        "line-height": "1.55 !important"
+      },
+      "a": { "color": "#3b82f6 !important" },
+      "::selection": { "background": "rgba(59,130,246,.25)" }
+    });
+    rendition.themes.select("webvault");
+  }
+
+  function setControlsDisabled(disabled) {
+    el.prev.disabled = disabled;
+    el.next.disabled = disabled;
+    el.progress.disabled = disabled;
+    el.tocBtn.disabled = disabled;
+    el.fontMinus.disabled = disabled;
+    el.fontPlus.disabled = disabled;
+    if (el.libraryBtn) el.libraryBtn.disabled = disabled;
+    if (el.markReadBtn) el.markReadBtn.disabled = disabled;
+  }
+
+  function flattenToc(items, level, out) {
+    (items || []).forEach(function (item) {
+      out.push({
+        label: item.label || item.title || "Sin título",
+        href: item.href || item.url || "",
+        level: level
+      });
+      if (item.subitems && item.subitems.length) flattenToc(item.subitems, level + 1, out);
+    });
+    return out;
+  }
+
+  function normaliseHref(href) {
+    return String(href || "").split("#")[0].replace(/^\.\//, "");
+  }
+
+  function hrefMatches(a, b) {
+    const x = normaliseHref(a);
+    const y = normaliseHref(b);
+    return !!x && !!y && (x === y || x.endsWith(y) || y.endsWith(x));
+  }
+
+  function getCurrentIndexFromLocation(location) {
+    if (!location || !location.start || !location.start.href) return currentIndex;
+    const href = location.start.href;
+    for (let i = 0; i < spineItems.length; i += 1) {
+      const item = spineItems[i];
+      if (hrefMatches(href, item.href || item.url || item.canonical)) return i;
+    }
+    return currentIndex;
+  }
+
+  function findTocLabel(location) {
+    if (!location || !location.start || !location.start.href) return "";
+    const href = location.start.href;
+    let best = "";
+    tocItems.forEach(function (item) {
+      if (hrefMatches(href, item.href)) best = item.label;
+    });
+    return best;
+  }
+
+  function updateTocActive(location) {
+    const buttons = el.tocList.querySelectorAll(".tocItem");
+    buttons.forEach(function (btn) { btn.classList.remove("active"); });
+    if (!location || !location.start || !location.start.href) return;
+    for (let i = 0; i < buttons.length; i += 1) {
+      if (hrefMatches(location.start.href, buttons[i].dataset.href)) {
+        buttons[i].classList.add("active");
+        break;
+      }
+    }
+  }
+
+
+  function getPageBasedPercent(location) {
+    if (!spineItems.length) return 0;
+
+    const sections = Math.max(spineItems.length - 1, 1);
+    const sectionIndex = clamp(Number(currentIndex) || 0, 0, Math.max(spineItems.length - 1, 0));
+
+    const displayed = location && location.start && location.start.displayed
+      ? location.start.displayed
+      : null;
+
+    const page = displayed && Number.isFinite(Number(displayed.page))
+      ? Number(displayed.page)
+      : 1;
+
+    const total = displayed && Number.isFinite(Number(displayed.total))
+      ? Number(displayed.total)
+      : 1;
+
+    let intraSection = 0;
+    if (total > 1) {
+      intraSection = clamp((page - 1) / (total - 1), 0, 1);
+    }
+
+    if (spineItems.length <= 1) {
+      return intraSection;
+    }
+
+    return clamp((sectionIndex + intraSection) / sections, 0, 1);
+  }
+
+  function updateProgressFromPercent(percent) {
+    currentPercent = clamp(Number(percent) || 0, 0, 1);
+    const percentText = Math.round(currentPercent * 1000) / 10;
+    el.progress.max = String(PROGRESS_MAX);
+    el.progress.value = String(Math.round(currentPercent * PROGRESS_MAX));
+    el.progressLabel.textContent = percentText.toFixed(percentText % 1 === 0 ? 0 : 1) + "%";
+    updateLibraryStatus();
+  }
+
+  function updateProgressFallback(index) {
+    if (!spineItems.length) {
+      el.progress.max = String(PROGRESS_MAX);
+      el.progress.value = "0";
+      el.progressLabel.textContent = "0%";
+      return;
+    }
+    currentIndex = clamp(index, 0, spineItems.length - 1);
+    const percent = spineItems.length <= 1 ? 0 : currentIndex / (spineItems.length - 1);
+    updateProgressFromPercent(percent);
+  }
+
+  async function goToProgressValue(value) {
+    if (!rendition) return;
+    const percent = clamp(Number(value) / PROGRESS_MAX, 0, 1);
+    updateProgressFromPercent(percent);
+    try {
+      const index = Math.round(percent * Math.max(spineItems.length - 1, 0));
+      await goToIndex(index);
+    } catch (err) {
+      showError("ERROR saltando al progreso seleccionado:\n" + err);
+    }
+  }
+
+  async function goToIndex(index) {
+    if (!spineItems.length || !rendition) return;
+    const safeIndex = clamp(Number(index) || 0, 0, spineItems.length - 1);
+    const item = spineItems[safeIndex];
+    if (!item) return;
+    updateProgressFallback(safeIndex);
+    await rendition.display(item.href || item.cfi || safeIndex);
+  }
+
+  function openToc() {
+    const wasOpen = panelIsOpen(el.tocPanel);
+    closeAllPanels();
+    if (wasOpen) return;
+    el.tocPanel.classList.add("open");
+    el.overlay.classList.add("show");
+  }
+
+  function closeToc() {
+    if (el.tocPanel) el.tocPanel.classList.remove("open");
+    el.overlay.classList.remove("show");
+  }
+
+  function openReaders() {
+    const wasOpen = panelIsOpen(el.readerPanel);
+    closeAllPanels();
+    if (wasOpen) return;
+    el.readerPanel.classList.add("open");
+    el.overlay.classList.add("show");
+  }
+
+  function closeReaders() {
+    if (el.readerPanel) el.readerPanel.classList.remove("open");
+    el.overlay.classList.remove("show");
+  }
+
+  function applyReaderMode(mode) {
+    readerMode = mode === "flipbook" ? "flipbook" : "epub";
+    const main = el.main || document.getElementById("main");
+
+    if (readerMode === "flipbook") {
+      main.classList.add("flipbookMode");
+      el.readerFlipbook.classList.add("active");
+      el.readerEpub.classList.remove("active");
+      if (el.flipbookStatus) el.flipbookStatus.textContent = "Modo FlipBook EPUB.js · texto refluible";
+      try {
+        if (rendition && rendition.spread) rendition.spread(window.innerWidth < 760 ? "none" : "always");
+        if (rendition && rendition.resize) rendition.resize();
+      } catch (err) {}
+    } else {
+      main.classList.remove("flipbookMode", "turnNext", "turnPrev");
+      el.readerEpub.classList.add("active");
+      el.readerFlipbook.classList.remove("active");
+      try {
+        if (rendition && rendition.spread) rendition.spread("auto");
+        if (rendition && rendition.resize) rendition.resize();
+      } catch (err) {}
+    }
+
+    saveState({ readerMode: readerMode });
+  }
+
+  function syncReaderModeAfterResize() {
+    if (readerMode !== "flipbook") return;
+    try {
+      if (rendition && rendition.spread) rendition.spread(window.innerWidth < 760 ? "none" : "always");
+      if (rendition && rendition.resize) rendition.resize();
+    } catch (err) {}
+  }
+
+  function flipAnimate(direction) {
+    if (readerMode !== "flipbook") return;
+    const main = document.getElementById("main");
+    const cls = direction === "prev" ? "turnPrev" : "turnNext";
+    main.classList.remove("turnNext", "turnPrev");
+    void main.offsetWidth;
+    main.classList.add(cls);
+    window.setTimeout(function () {
+      main.classList.remove(cls);
+    }, 460);
+  }
+
+  async function nextPage() {
+    if (!rendition) return;
+    flipAnimate("next");
+    try {
+      await rendition.next();
+    } catch (err) {
+      try { await goToIndex(currentIndex + 1); }
+      catch (err2) { showError("ERROR pasando página:\n" + err2); }
+    }
+  }
+
+  async function prevPage() {
+    if (!rendition) return;
+    flipAnimate("prev");
+    try {
+      await rendition.prev();
+    } catch (err) {
+      try { await goToIndex(currentIndex - 1); }
+      catch (err2) { showError("ERROR pasando página:\n" + err2); }
+    }
+  }
+
+  function openFlipbook() {
+    applyReaderMode("flipbook");
+    closeReaders();
+  }
+
+  function renderToc() {
+    el.tocList.innerHTML = "";
+    if (!tocItems.length) {
+      const empty = document.createElement("div");
+      empty.style.padding = "14px";
+      empty.textContent = "Este EPUB no trae índice.";
+      el.tocList.appendChild(empty);
+      return;
+    }
+    tocItems.forEach(function (item) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "tocItem tocLevel" + clamp(item.level, 1, 3);
+      btn.textContent = item.label;
+      btn.dataset.href = item.href;
+      btn.addEventListener("click", async function () {
+        closeToc();
+        try {
+          await rendition.display(item.href);
+        } catch (err) {
+          showError("ERROR abriendo capítulo:\n" + err);
+        }
+      });
+      el.tocList.appendChild(btn);
+    });
+  }
+
+  function onRelocated(location) {
+    if (!location || !location.start) return;
+    removeActiveTemporaryMarker();
+    currentIndex = getCurrentIndexFromLocation(location);
+    currentCfi = location.start.cfi || null;
+
+    // Progreso visual real por página renderizada: usa displayed.page / displayed.total
+    // del location de EPUB.js para que la barra avance página a página, no solo por sección/spine.
+    const percent = getPageBasedPercent(location);
+
+    if (!isSliding) updateProgressFromPercent(percent);
+    const label = findTocLabel(location);
+    el.chapter.textContent = label || ("Sección " + (currentIndex + 1) + " de " + Math.max(spineItems.length, 1));
+    updateTocActive(location);
+    saveState({ cfi: currentCfi, percent: percent, index: currentIndex });
+  }
+
+  function installKeyboard() {
+    document.addEventListener("keydown", async function (e) {
+      if (!rendition) return;
+      const tag = (e.target && e.target.tagName || "").toLowerCase();
+      if (["input", "select", "textarea", "button"].includes(tag)) return;
+      if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        prevPage();
+      } else if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
+        e.preventDefault();
+        nextPage();
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        await goToProgressValue(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        await goToProgressValue(PROGRESS_MAX);
+      } else if (e.key === "Escape") {
+        closeAllPanels();
+        exitHighlightSelectMode();
+      }
+    });
+  }
+
+  function installTouchGestures() {
+    el.viewer.addEventListener("touchstart", function (e) {
+      if (!e.changedTouches || !e.changedTouches.length) return;
+      const t = e.changedTouches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+      touchStartTime = Date.now();
+    }, { passive: true });
+
+    el.viewer.addEventListener("touchend", function (e) {
+      if (!rendition || !e.changedTouches || !e.changedTouches.length) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStartX;
+      const dy = t.clientY - touchStartY;
+      const elapsed = Date.now() - touchStartTime;
+      if (elapsed > 750 || Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      if (dx < 0) nextPage();
+      if (dx > 0) prevPage();
+    }, { passive: true });
+  }
+
+  function installPageClickZones() {
+    let startX = 0;
+    let startY = 0;
+    let startTime = 0;
+    let didTurn = false;
+
+    function turnFromZone(direction) {
+      if (readerMode !== "flipbook" || !rendition) return;
+      if (direction === "next") nextPage();
+      else prevPage();
+    }
+
+    function armZone(zone, direction) {
+      if (!zone) return;
+
+      zone.addEventListener("pointerdown", function (e) {
+        if (readerMode !== "flipbook" || !rendition) return;
+        startX = e.clientX;
+        startY = e.clientY;
+        startTime = Date.now();
+        didTurn = false;
+        try { zone.setPointerCapture(e.pointerId); } catch (_err) {}
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      zone.addEventListener("pointermove", function (e) {
+        if (readerMode !== "flipbook" || !rendition || didTurn) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        const isHorizontalDrag = Math.abs(dx) > 42 && Math.abs(dx) > Math.abs(dy) * 1.15;
+        if (direction === "next" && isHorizontalDrag && dx < 0) {
+          didTurn = true;
+          turnFromZone("next");
+        } else if (direction === "prev" && isHorizontalDrag && dx > 0) {
+          didTurn = true;
+          turnFromZone("prev");
+        }
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      zone.addEventListener("pointerup", function (e) {
+        if (readerMode !== "flipbook" || !rendition) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        const elapsed = Date.now() - startTime;
+        const isClick = elapsed < 700 && Math.abs(dx) < 22 && Math.abs(dy) < 22;
+
+        if (!didTurn && isClick) {
+          didTurn = true;
+          turnFromZone(direction);
+        }
+
+        try { zone.releasePointerCapture(e.pointerId); } catch (_err) {}
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      zone.addEventListener("click", function (e) {
+        if (readerMode === "flipbook") {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      });
+    }
+
+    armZone(el.flipPrevZone, "prev");
+    armZone(el.flipNextZone, "next");
+  }
+
+  function installControls() {
+    el.prev.addEventListener("click", function () { prevPage(); });
+    el.next.addEventListener("click", function () { nextPage(); });
+    el.tocBtn.addEventListener("click", openToc);
+    el.tocClose.addEventListener("click", closeToc);
+    el.overlay.addEventListener("click", closeAllPanels);
+    el.readerBtn.addEventListener("click", openReaders);
+    el.readerClose.addEventListener("click", closeReaders);
+    el.readerEpub.addEventListener("click", function () { applyReaderMode("epub"); closeReaders(); });
+    el.readerFlipbook.addEventListener("click", openFlipbook);
+    el.bookmarkAddBtn.addEventListener("click", addBookmark);
+    el.bookmarksBtn.addEventListener("click", openBookmarks);
+    el.bookmarkClose.addEventListener("click", closeBookmarks);
+    if (el.bookmarkSearchInput) el.bookmarkSearchInput.addEventListener("input", renderBookmarks);
+    if (el.bookmarkSearchClear) el.bookmarkSearchClear.addEventListener("click", function () {
+      if (el.bookmarkSearchInput) el.bookmarkSearchInput.value = "";
+      renderBookmarks();
+      if (el.bookmarkSearchInput) el.bookmarkSearchInput.focus();
+    });
+    if (el.bookSearchBtn) el.bookSearchBtn.addEventListener("click", openBookSearch);
+    if (el.bookSearchClose) el.bookSearchClose.addEventListener("click", closeBookSearch);
+    if (el.bookSearchRun) el.bookSearchRun.addEventListener("click", searchCurrentBook);
+    if (el.bookSearchInput) el.bookSearchInput.addEventListener("keydown", function (e) { if (e.key === "Enter") searchCurrentBook(); });
+    if (el.instructionsBtn) el.instructionsBtn.addEventListener("click", openInstructions);
+    if (el.instructionsClose) el.instructionsClose.addEventListener("click", closeInstructions);
+    if (el.libraryBtn) el.libraryBtn.addEventListener("click", openLibrary);
+    if (el.libraryClose) el.libraryClose.addEventListener("click", closeLibrary);
+    if (el.libraryReadingTab) el.libraryReadingTab.addEventListener("click", function () { setLibraryView("reading"); });
+    if (el.libraryFinishedTab) el.libraryFinishedTab.addEventListener("click", function () { setLibraryView("finished"); });
+    if (el.profileExportBtn) el.profileExportBtn.addEventListener("click", exportReaderProfile);
+    if (el.profileImportBtn) el.profileImportBtn.addEventListener("click", function () { if (el.profileImportFile) el.profileImportFile.click(); });
+    if (el.profileImportFile) el.profileImportFile.addEventListener("change", function () { importReaderProfileFromFile(el.profileImportFile.files && el.profileImportFile.files[0]); });
+    if (el.markReadBtn) el.markReadBtn.addEventListener("click", markCurrentAsRead);
+    if (el.highlightsBtn) el.highlightsBtn.addEventListener("click", openHighlightChooser);
+    if (el.highlightCancel) el.highlightCancel.addEventListener("click", hideHighlightPopup);
+    if (el.noteAddFromSelection) el.noteAddFromSelection.addEventListener("click", openNoteDialogFromSelection);
+    if (el.noteDialogClose) el.noteDialogClose.addEventListener("click", hideNoteDialog);
+    if (el.noteCancel) el.noteCancel.addEventListener("click", hideNoteDialog);
+    if (el.noteSave) el.noteSave.addEventListener("click", saveCurrentNote);
+    document.querySelectorAll(".hlColor").forEach(function (btn) {
+      btn.addEventListener("click", function () { addHighlight(btn.dataset.color || "yellow"); });
+    });
+    document.querySelectorAll(".noteColor").forEach(function (btn) {
+      btn.addEventListener("click", function () { setSelectedNoteColor(btn.dataset.color || "yellow"); });
+    });
+
+    el.progress.addEventListener("input", function () {
+      isSliding = true;
+      updateProgressFromPercent(Number(el.progress.value) / PROGRESS_MAX);
+    });
+    el.progress.addEventListener("change", async function () {
+      try {
+        await goToProgressValue(Number(el.progress.value));
+      } finally {
+        isSliding = false;
+      }
+    });
+
+    el.fontMinus.addEventListener("click", function () {
+      const state = getSavedState();
+      applyFontSize((state.fontSize || DEFAULT_FONT_SIZE) - FONT_STEP);
+    });
+    el.fontPlus.addEventListener("click", function () {
+      const state = getSavedState();
+      applyFontSize((state.fontSize || DEFAULT_FONT_SIZE) + FONT_STEP);
+    });
+    el.theme.addEventListener("change", function () { applyTheme(el.theme.value); });
+    el.fullscreen.addEventListener("click", function () {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(function (err) { showError("No se pudo activar pantalla completa:\n" + err); });
+      } else {
+        document.exitFullscreen().catch(function () {});
+      }
+    });
+  }
+
+  async function start() {
+    setControlsDisabled(true);
+    hideError();
+
+    if (!file) {
+      showError("ERROR: falta el parámetro file en la URL. Ejemplo: reader.html?file=/epub/libro.epub");
+      return;
+    }
+    if (typeof JSZip === "undefined") {
+      showError("ERROR: jszip.min.js no se ha cargado correctamente desde /static/jszip.min.js");
+      return;
+    }
+    if (typeof ePub !== "function") {
+      showError("ERROR: epub.min.js no se ha cargado correctamente desde /static/epub.min.js");
+      return;
+    }
+
+    const saved = getSavedState();
+    applyTheme(saved.theme || "sepia");
+
+    try {
+      el.title.textContent = "Cargando…";
+      el.chapter.textContent = file;
+
+      book = ePub(file);
+      window.book = book;
+
+      rendition = book.renderTo("viewer", {
+        width: "100%",
+        height: "100%",
+        spread: "auto",
+        flow: "paginated",
+        manager: "default"
+      });
+      window.rendition = rendition;
+
+      applyReaderMode(saved.readerMode || "epub");
+      applyBookTheme();
+      applyFontSize(saved.fontSize || DEFAULT_FONT_SIZE);
+
+      rendition.on("relocated", onRelocated);
+      rendition.on("selected", function (cfiRange, contents) {
+        let selected = "";
+        try {
+          selected = contents && contents.window && contents.window.getSelection
+            ? contents.window.getSelection().toString()
+            : "";
+        } catch (err) {}
+        if (cfiRange && normaliseSelectionText(selected)) {
+          showHighlightPopup(cfiRange, selected);
+        }
+      });
+      rendition.on("rendered", function () {
+        applyBookTheme();
+        applyFontSize(getSavedState().fontSize || DEFAULT_FONT_SIZE);
+        applyAllHighlights();
+        applyAllNoteHighlights();
+      });
+
+      await book.ready;
+      spineItems = book.spine && book.spine.spineItems ? book.spine.spineItems : [];
+      updateProgressFallback(saved.index || 0);
+
+      try {
+        const meta = await book.loaded.metadata;
+        if (meta && meta.title) el.title.textContent = meta.title;
+        else el.title.textContent = "Leyendo";
+      } catch (err) {
+        el.title.textContent = "Leyendo";
+      }
+
+      try {
+        const navigation = await book.loaded.navigation;
+        tocItems = flattenToc(navigation && navigation.toc ? navigation.toc : [], 1, []);
+        renderToc();
+      } catch (err) {
+        tocItems = [];
+        renderToc();
+      }
+
+      try {
+        if (book.locations && book.locations.generate) await book.locations.generate(1000);
+      } catch (err) {
+        console.warn("No se pudieron generar locations; se usará progreso por spine", err);
+      }
+
+      if (saved.cfi) {
+        try { await rendition.display(saved.cfi); }
+        catch (err) { await rendition.display(); }
+      } else if (Number.isFinite(saved.index) && saved.index > 0) {
+        await goToIndex(saved.index);
+      } else {
+        await rendition.display();
+      }
+
+      setControlsDisabled(false);
+      updateMarkReadButton();
+      applyAllHighlights();
+      applyAllNoteHighlights();
+      renderBookmarks();
+      reportReaderVisit();
+    } catch (err) {
+      showError("ERROR creando lector:\n" + (err && err.stack ? err.stack : err));
+    }
+  }
+
+  installControls();
+  installKeyboard();
+  installTouchGestures();
+  installPageClickZones();
+  window.addEventListener("resize", syncReaderModeAfterResize);
+  start();
+}());
+</script>
+</body>
+</html>
