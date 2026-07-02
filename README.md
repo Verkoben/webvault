@@ -486,3 +486,8 @@ Porque la mejor ingeniería no siempre consiste en añadir más piezas.
 
 Muchas veces consiste en conseguir que unas pocas piezas hagan extraordinariamente bien su trabajo.
 
+
+https://github.com/user-attachments/assets/9ea2fe5e-36fa-4d22-a3a3-dd1fde2a0364
+
+
+
