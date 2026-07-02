@@ -425,6 +425,11 @@ Contraseña:trascala
 Seguridad
 
 Por defecto, WebVault se distribuye con NOPASSWD=True=(1) para facilitar las pruebas locales. Si desactiva NOPASSWD, edite USERNAME y PASSWORD en server.py antes de desplegarlo en una red accesible.
+# Ejemplo de credenciales.
+# Si NOPASSWD=False, cambie estos valores antes de usar WebVault en una red accesible.
+
+USERNAME = "pedro"
+PASSWORD = "trascala"
 
 - 📚 Biblioteca
 - 🔍 Búsqueda global
