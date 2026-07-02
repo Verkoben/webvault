@@ -424,10 +424,7 @@ Contraseña:trascala
 
 Seguridad
 
-WebVault, por simplicidad, se distribuye con la autenticación deshabilitada (NOPASSWD) para facilitar las pruebas locales.
-
-Para instalaciones accesibles desde Internet se recomienda habilitar autenticación. El código necesario para ello ya está incluido en el proyecto y puede activarse configurando usuario y contraseña según se desee en server.py.
-
+Por defecto, WebVault se distribuye con NOPASSWD=True=(1) para facilitar las pruebas locales. Si desactiva NOPASSWD, edite USERNAME y PASSWORD en server.py antes de desplegarlo en una red accesible.
 
 - 📚 Biblioteca
 - 🔍 Búsqueda global
