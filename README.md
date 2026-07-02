@@ -422,6 +422,12 @@ Puedes probar WebVault directamente desde el navegador:
 Usuario:pedro
 Contraseña:trascala
 
+Seguridad
+
+WebVault, por simplicidad, se distribuye con la autenticación deshabilitada (NOPASSWD) para facilitar las pruebas locales.
+
+Para instalaciones accesibles desde Internet se recomienda habilitar autenticación. El código necesario para ello ya está incluido en el proyecto y puede activarse configurando usuario y contraseña según la documentación.
+
 La demostración utiliza una pequeña colección de libros libres de derechos para mostrar todas las 
 funcionalidades del lector:
 
