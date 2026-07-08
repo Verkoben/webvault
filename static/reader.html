@@ -1245,6 +1245,23 @@ html[data-theme="sepia"] #main.flipbookMode {
   font-weight: 800;
 }
 
+
+/* FIX WebVault: al cambiar EPUB.js <-> FlipBook, evita páginas montadas durante el recálculo */
+#viewer .epub-container,
+#viewer .epub-view {
+  max-width: 100% !important;
+}
+
+#main.flipbookMode #viewer .epub-container,
+#main.flipbookMode #viewer .epub-view {
+  overflow: hidden !important;
+}
+
+#main.readerRelayout #viewer {
+  opacity: 0.04;
+  pointer-events: none;
+}
+
 </style>
 </head>
 <body>
@@ -3335,6 +3352,41 @@ html[data-theme="sepia"] #main.flipbookMode {
     el.overlay.classList.remove("show");
   }
 
+
+  function forceReaderRelayoutAfterModeSwitch() {
+    if (!rendition) return;
+
+    const main = el.main || document.getElementById("main");
+    const target = currentCfi || null;
+
+    if (main) main.classList.add("readerRelayout");
+
+    function onePass() {
+      try {
+        if (rendition && rendition.resize) rendition.resize();
+      } catch (err) {}
+
+      try {
+        if (target && rendition && rendition.display) {
+          rendition.display(target).catch(function () {});
+        }
+      } catch (err) {}
+    }
+
+    window.requestAnimationFrame(function () {
+      onePass();
+      window.setTimeout(function () {
+        onePass();
+        window.setTimeout(function () {
+          try {
+            if (rendition && rendition.resize) rendition.resize();
+          } catch (err) {}
+          if (main) main.classList.remove("readerRelayout");
+        }, 220);
+      }, 80);
+    });
+  }
+
   function applyReaderMode(mode) {
     readerMode = mode === "flipbook" ? "flipbook" : "epub";
     const main = el.main || document.getElementById("main");
@@ -3358,6 +3410,7 @@ html[data-theme="sepia"] #main.flipbookMode {
       } catch (err) {}
     }
 
+    forceReaderRelayoutAfterModeSwitch();
     saveState({ readerMode: readerMode });
   }
 
@@ -3367,6 +3420,11 @@ html[data-theme="sepia"] #main.flipbookMode {
       if (rendition && rendition.spread) rendition.spread(window.innerWidth < 760 ? "none" : "always");
       if (rendition && rendition.resize) rendition.resize();
     } catch (err) {}
+    window.setTimeout(function () {
+      try {
+        if (rendition && rendition.resize) rendition.resize();
+      } catch (err) {}
+    }, 120);
   }
 
   function flipAnimate(direction) {
