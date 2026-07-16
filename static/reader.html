@@ -1246,14 +1246,22 @@ html[data-theme="sepia"] #main.flipbookMode {
 }
 
 
-/* FIX WebVault: al cambiar EPUB.js <-> FlipBook, evita páginas montadas durante el recálculo */
-#viewer .epub-container,
-#viewer .epub-view {
+/* FIX WebVault: conserva TODAS las páginas generadas por EPUB.js.
+   IMPORTANTE: no limitar .epub-view con max-width:100%, porque EPUB.js necesita
+   dimensiones internas propias para construir todas las columnas/páginas. */
+#viewer > .epub-container {
+  width: 100% !important;
   max-width: 100% !important;
+  height: 100% !important;
 }
 
-#main.flipbookMode #viewer .epub-container,
-#main.flipbookMode #viewer .epub-view {
+#viewer .epub-view {
+  max-width: none !important;
+}
+
+/* El recorte se aplica sólo al contenedor visible, nunca a la vista interna. */
+#main.flipbookMode #viewer,
+#main.flipbookMode #viewer > .epub-container {
   overflow: hidden !important;
 }
 
@@ -1540,6 +1548,8 @@ html[data-theme="sepia"] #main.flipbookMode {
   let libraryView = "reading";
   let bookSearchGeneration = 0;
   let activeTemporaryMarker = null;
+  let locationsReady = false;
+  let pageNavigationBusy = false;
 
   const el = {
     root: document.documentElement,
@@ -3309,7 +3319,24 @@ html[data-theme="sepia"] #main.flipbookMode {
     if (!rendition) return;
     const percent = clamp(Number(value) / PROGRESS_MAX, 0, 1);
     updateProgressFromPercent(percent);
+
     try {
+      /* Si EPUB.js ha generado locations, saltamos a una posición REAL del libro.
+         Antes se convertía el porcentaje únicamente a un índice del spine, lo que
+         podía omitir todas las páginas intermedias de capítulos largos. */
+      if (
+        locationsReady &&
+        book &&
+        book.locations &&
+        typeof book.locations.cfiFromPercentage === "function"
+      ) {
+        const cfi = book.locations.cfiFromPercentage(percent);
+        if (cfi) {
+          await rendition.display(cfi);
+          return;
+        }
+      }
+
       const index = Math.round(percent * Math.max(spineItems.length - 1, 0));
       await goToIndex(index);
     } catch (err) {
@@ -3439,25 +3466,95 @@ html[data-theme="sepia"] #main.flipbookMode {
     }, 460);
   }
 
+  function locationCfiNow() {
+    try {
+      const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
+      return loc && loc.start && loc.start.cfi ? loc.start.cfi : (currentCfi || "");
+    } catch (err) {
+      return currentCfi || "";
+    }
+  }
+
+  function waitForRelocation(previousCfi, timeoutMs) {
+    return new Promise(function (resolve) {
+      const started = Date.now();
+
+      function check() {
+        const nowCfi = locationCfiNow();
+        if (nowCfi && nowCfi !== previousCfi) {
+          resolve(true);
+          return;
+        }
+        if (Date.now() - started >= timeoutMs) {
+          resolve(false);
+          return;
+        }
+        window.setTimeout(check, 35);
+      }
+
+      check();
+    });
+  }
+
   async function nextPage() {
-    if (!rendition) return;
+    if (!rendition || pageNavigationBusy) return;
+    pageNavigationBusy = true;
     flipAnimate("next");
+
+    const beforeCfi = locationCfiNow();
+    const beforeIndex = currentIndex;
+
     try {
       await rendition.next();
+      const moved = await waitForRelocation(beforeCfi, 420);
+
+      /* Algunos EPUB mal construidos llegan al final de un XHTML y EPUB.js no
+         lanza error ni avanza al siguiente elemento del spine. En ese caso
+         forzamos exclusivamente el siguiente capítulo, sin saltarnos páginas. */
+      if (!moved && beforeIndex < spineItems.length - 1) {
+        await goToIndex(beforeIndex + 1);
+      }
     } catch (err) {
-      try { await goToIndex(currentIndex + 1); }
-      catch (err2) { showError("ERROR pasando página:\n" + err2); }
+      try {
+        if (beforeIndex < spineItems.length - 1) await goToIndex(beforeIndex + 1);
+      } catch (err2) {
+        showError("ERROR pasando página:\n" + err2);
+      }
+    } finally {
+      pageNavigationBusy = false;
     }
   }
 
   async function prevPage() {
-    if (!rendition) return;
+    if (!rendition || pageNavigationBusy) return;
+    pageNavigationBusy = true;
     flipAnimate("prev");
+
+    const beforeCfi = locationCfiNow();
+    const beforeIndex = currentIndex;
+
     try {
       await rendition.prev();
+      const moved = await waitForRelocation(beforeCfi, 420);
+
+      if (!moved && beforeIndex > 0) {
+        const previousItem = spineItems[beforeIndex - 1];
+        await rendition.display(previousItem.href || previousItem.cfi || (beforeIndex - 1));
+        /* Después de abrir la sección anterior, pedimos su última página. */
+        await rendition.prev();
+      }
     } catch (err) {
-      try { await goToIndex(currentIndex - 1); }
-      catch (err2) { showError("ERROR pasando página:\n" + err2); }
+      try {
+        if (beforeIndex > 0) {
+          const previousItem = spineItems[beforeIndex - 1];
+          await rendition.display(previousItem.href || previousItem.cfi || (beforeIndex - 1));
+          await rendition.prev();
+        }
+      } catch (err2) {
+        showError("ERROR pasando página:\n" + err2);
+      }
+    } finally {
+      pageNavigationBusy = false;
     }
   }
 
@@ -3499,9 +3596,21 @@ html[data-theme="sepia"] #main.flipbookMode {
     currentIndex = getCurrentIndexFromLocation(location);
     currentCfi = location.start.cfi || null;
 
-    // Progreso visual real por página renderizada: usa displayed.page / displayed.total
-    // del location de EPUB.js para que la barra avance página a página, no solo por sección/spine.
-    const percent = getPageBasedPercent(location);
+    // Usa locations reales cuando están disponibles. Así capítulos muy largos
+    // conservan todas sus páginas y la barra no salta de capítulo en capítulo.
+    let percent = getPageBasedPercent(location);
+    if (
+      locationsReady &&
+      currentCfi &&
+      book &&
+      book.locations &&
+      typeof book.locations.percentageFromCfi === "function"
+    ) {
+      try {
+        const exactPercent = book.locations.percentageFromCfi(currentCfi);
+        if (Number.isFinite(exactPercent)) percent = exactPercent;
+      } catch (err) {}
+    }
 
     if (!isSliding) updateProgressFromPercent(percent);
     const label = findTocLabel(location);
@@ -3759,6 +3868,14 @@ html[data-theme="sepia"] #main.flipbookMode {
         applyFontSize(getSavedState().fontSize || DEFAULT_FONT_SIZE);
         applyAllHighlights();
         applyAllNoteHighlights();
+
+        /* EPUB con CSS propio o imágenes grandes pueden cambiar de alto después
+           del primer render. Un segundo resize recalcula todas las columnas. */
+        window.requestAnimationFrame(function () {
+          try {
+            if (rendition && rendition.resize) rendition.resize();
+          } catch (err) {}
+        });
       });
 
       await book.ready;
@@ -3783,9 +3900,13 @@ html[data-theme="sepia"] #main.flipbookMode {
       }
 
       try {
-        if (book.locations && book.locations.generate) await book.locations.generate(1000);
+        if (book.locations && book.locations.generate) {
+          await book.locations.generate(700);
+          locationsReady = true;
+        }
       } catch (err) {
-        console.warn("No se pudieron generar locations; se usará progreso por spine", err);
+        locationsReady = false;
+        console.warn("No se pudieron generar locations; se usará progreso paginado por spine", err);
       }
 
       if (saved.cfi) {
